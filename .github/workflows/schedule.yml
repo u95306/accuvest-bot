@@ -16,13 +16,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          cache: 'pip' # 快取套件，讓未來的執行速度更快
+          #cache: 'pip' # 快取套件，讓未來的執行速度更快
 
       - name: 📦 安裝依賴套件 (Install Requirements)
         run: |
-          python -m pip install --upgrade pip
           
-          pip install requests pandas google-genai fredapi
+          python -m pip install --upgrade pip
+         
+          pip install google-genai requests pandas fredapi
+          
+          pip list
 
       - name: 📡 步驟一：資料獲取層 (Data Ingestion)
         env:
@@ -38,4 +41,4 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
-        run: python main.py
+        run: python notification_layer.py
