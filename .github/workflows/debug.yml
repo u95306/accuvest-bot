@@ -25,4 +25,4 @@ jobs:
       - name: 🩺 執行 API 診斷程式
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: python debug_apis.py
+        run: python debug.py
