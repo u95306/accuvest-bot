@@ -1,7 +1,7 @@
 import os
 import requests
 import json
-from google import genai
+import google.generativeai as genai
 
 # 從環境變數安全地讀取鑰匙 (不要把真實字串寫在這裡了！)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
