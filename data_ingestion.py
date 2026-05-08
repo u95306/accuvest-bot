@@ -6,6 +6,8 @@ import zipfile
 import io
 import pandas as pd
 import json
+import os
+from fredapi import Fred
 
 def fetch_and_save_taiwan_light(zip_url):
     """
@@ -52,12 +54,9 @@ if __name__ == "__main__":
 # ==========================================
 # 模組 1: 資料獲取層 (data_ingestion)
 # ==========================================
-from fredapi import Fred
-import pandas as pd
-import json
 
 # ⚠️ 請換上妳重新生成的新 API Key
-FRED_API_KEY = '359f40b1c0ecb081e1d8f14d0f3287fd'
+FRED_API_KEY = os.environ.get("FRED_API_KEY")
 fred = Fred(api_key=FRED_API_KEY)
 
 def fetch_and_save_macro_data():
@@ -100,13 +99,6 @@ fetch_and_save_macro_data()
 # ==========================================
 # 模組 1: 資料獲取層 (新增殖利率利差)
 # ==========================================
-from fredapi import Fred
-import pandas as pd
-import json
-
-# 請確認使用最新的 API Key
-FRED_API_KEY = '359f40b1c0ecb081e1d8f14d0f3287fd'
-fred = Fred(api_key=FRED_API_KEY)
 
 def fetch_and_save_yield_curve():
     """
@@ -146,12 +138,6 @@ fetch_and_save_yield_curve()
 # ==========================================
 # 模組 1: 資料獲取層 (新增 CPI 與 利率)
 # ==========================================
-from fredapi import Fred
-import pandas as pd
-import json
-
-FRED_API_KEY = '359f40b1c0ecb081e1d8f14d0f3287fd'
-fred = Fred(api_key=FRED_API_KEY)
 
 def fetch_safety_indicators():
     """
