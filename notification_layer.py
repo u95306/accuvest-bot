@@ -3,11 +3,13 @@ import requests
 import json
 from google import genai
 
-# ==========================================
-# 1. 環境變數設定區 (請填入你的鑰匙)
-# ==========================================
-GEMINI_API_KEY = "AIzaSyAckglEKvcgtMDgn0_Y3LugeBdp89kA0MA"
-LINE_CHANNEL_TOKEN = "FqwKuJ+dkEzeqMqoK3wFtgHMadLkEA/SNLnyOMOapnsqZN02FwcLk5AFVlqAoSJ/M+OcJQK+JASqMdxKwrgDkuYujAxN7a46PjX+QfYMGe+bS2nqLvpsTHhlyYCRDrGB7RvjKSI3gxxO3opONGdG3wdB04t89/1O/w1cDnyilFU=" # 填入你剛測試成功的超長 Token
+# 從環境變數安全地讀取鑰匙 (不要把真實字串寫在這裡了！)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+LINE_CHANNEL_TOKEN = os.environ.get("LINE_CHANNEL_TOKEN")
+
+# 如果讀不到鑰匙，程式提早報錯退出
+if not GEMINI_API_KEY or not LINE_CHANNEL_TOKEN:
+    raise ValueError("⚠️ 找不到環境變數中的 API 鑰匙，請檢查設定！")
 
 # 初始化 Gemini 客戶端
 client = genai.Client(api_key=GEMINI_API_KEY)
