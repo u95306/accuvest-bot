@@ -30,6 +30,10 @@ def fetch_and_save_taiwan_light(zip_url):
                 except:
                     real_name = zinfo.filename
                 
+                # 💡 新增防呆：看到 schema 就直接跳過，不論大小寫
+                if 'schema' in real_name.lower():
+                    continue
+                    
                 if '景氣指標與燈號.csv' in real_name:
                     target_filename = zinfo.filename
                     print(f"🎯 成功透過檔名修復定位檔案: {real_name}")
