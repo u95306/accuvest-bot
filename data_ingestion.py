@@ -20,9 +20,45 @@ def fetch_and_save_taiwan_light(zip_url):
         response.raise_for_status()
 
         with zipfile.ZipFile(io.BytesIO(response.content)) as the_zip:
-            csv_filename = '景氣指標與燈號.csv'
-            with the_zip.open(csv_filename) as csv_file:
+            target_filename = None
+            
+            # 策略 A：嘗試修復檔名編碼
+            for zinfo in the_zip.infolist():
+                try:
+                    # 關鍵：將誤判為 CP437 的檔名轉回 CP950 (Big5)
+                    real_name = zinfo.filename.encode('cp437').decode('cp950')
+                except:
+                    real_name = zinfo.filename
+                
+                if '景氣指標與燈號.csv' in real_name:
+                    target_filename = zinfo.filename
+                    print(f"🎯 成功透過檔名修復定位檔案: {real_name}")
+                    break
+            
+            # 策略 B：如果策略 A 失敗，改用「內容特徵」掃描所有 CSV
+            if not target_filename:
+                print("⚠️ 檔名匹配失敗，啟動內容特徵掃描...")
+                for name in the_zip.namelist():
+                    if name.lower().endswith('.csv'):
+                        with the_zip.open(name) as f:
+                            # 只讀取標題列進行檢查，不耗費記憶體
+                            try:
+                                header_df = pd.read_csv(f, encoding='utf-8-sig', nrows=0)
+                                if '景氣對策信號' in header_df.columns:
+                                    target_filename = name
+                                    print(f"🎯 透過欄位特徵成功鎖定檔案: {name}")
+                                    break
+                            except:
+                                continue
+
+            if not target_filename:
+                print("❌ 窮盡所有方法仍找不到包含景氣燈號的 CSV 檔案。")
+                return False
+
+            # 讀取最終確定的檔案
+            with the_zip.open(target_filename) as csv_file:
                 df = pd.read_csv(csv_file, encoding='utf-8-sig')
+
 
         # 排序並取得最新一筆
         df = df.sort_values(by='Date').reset_index(drop=True)
