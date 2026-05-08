@@ -1,29 +1,40 @@
-name: AccuVest Daily Morning Briefing
+name: AccuVest Morning Briefing
 
 on:
-  # 這個設定讓你可以隨時在 GitHub 網頁上手動點擊 "Run workflow" 測試
   workflow_dispatch: 
+    # 加入這個設定，讓妳可以在 GitHub 網頁上手動點擊按鈕進行測試
 
 jobs:
-  run-bot:
-    runs-on: ubuntu-latest
+  execute-pipeline:
+    runs-on: ubuntu-latest # 使用最新的 Linux 虛擬機
+
     steps:
-      - name: 1. 下載程式碼 (Checkout)
+      - name: 📥 檢索程式碼 (Checkout Code)
         uses: actions/checkout@v4
-        
-      - name: 2. 建立 Python 環境
+
+      - name: 🐍 設定 Python 環境
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          
-      - name: 3. 安裝依賴套件 (Requirements)
+          cache: 'pip' # 快取套件，讓未來的執行速度更快
+
+      - name: 📦 安裝依賴套件 (Install Requirements)
         run: |
           python -m pip install --upgrade pip
-          pip install requests pandas google-genai
-          
-      - name: 4. 執行推播主程式
+          pip install -r requirements.txt
+
+      - name: 📡 步驟一：資料獲取層 (Data Ingestion)
         env:
-          # 將 GitHub Secrets 裡的鑰匙，注入到虛擬機的環境變數中
+          # 將存放在 GitHub Secrets 的金鑰注入虛擬環境
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python data_ingestion.py
+
+      - name: 🧠 步驟二：核心大腦層 (Strategy Brain)
+        # 大腦層只讀取本地 JSON，不需要外部金鑰
+        run: python strategy_brain.py
+
+      - name: 📢 步驟三：轉譯與推播層 (Notification Layer)
+        env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
-        run: python main.py
+        run: python notification_layer.py
