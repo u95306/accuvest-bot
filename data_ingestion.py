@@ -8,6 +8,7 @@ import pandas as pd
 import json
 import os
 from fredapi import Fred
+import time
 
 def fetch_and_save_taiwan_light(zip_url):
     """
@@ -51,6 +52,8 @@ if __name__ == "__main__":
     ZIP_URL = "https://ws.ndc.gov.tw/Download.ashx?u=LzAwMS9hZG1pbmlzdHJhdG9yLzEwL3JlbGZpbGUvNTc4MS82MzkyL2VhMjM1YmQ5LWQwNTItNGE2OS1hYmZjLWQ1Yzc4NWQzZDBlMi56aXA%3d&n=5pmv5rCj5oyH5qiZ5Y%2bK54eI6JmfLnppcA%3d%3d&icon=.zip"
     fetch_and_save_taiwan_light(ZIP_URL)
 
+
+
 # ==========================================
 # 模組 1: 資料獲取層 (data_ingestion)
 # ==========================================
@@ -66,6 +69,7 @@ def fetch_and_save_macro_data():
     print("📡 [資料層] 開始從 FRED 抓取美國製造業新訂單數據...")
     try:
         data = fred.get_series('AMTMNO')
+        time.sleep(2)
         if data.empty:
             return False
 
@@ -108,6 +112,7 @@ def fetch_and_save_yield_curve():
     try:
         # T10Y2Y 是 FRED 官方計算好的 10年減2年 利差數據
         data = fred.get_series('T10Y2Y')
+        time.sleep(2)
         if data.empty:
             return False
 
@@ -152,7 +157,7 @@ def fetch_safety_indicators():
 
         # 2. 抓取基準利率 (FEDFUNDS)
         fed_rate = fred.get_series('FEDFUNDS')
-
+        time.sleep(2)
         # 3. 整合最近半年的數據
         combined = pd.DataFrame({
             'cpi_yoy': cpi_df['cpi_yoy'],
