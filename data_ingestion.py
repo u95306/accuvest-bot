@@ -20,7 +20,7 @@ def fetch_and_save_taiwan_light(zip_url):
         response.raise_for_status()
 
         with zipfile.ZipFile(io.BytesIO(response.content)) as the_zip:
-            csv_filename = "景氣指標與燈號.csv"
+            csv_filename = '景氣指標與燈號.csv'
             with the_zip.open(csv_filename) as csv_file:
                 df = pd.read_csv(csv_file, encoding='utf-8-sig')
 
