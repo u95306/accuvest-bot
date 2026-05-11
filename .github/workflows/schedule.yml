@@ -37,8 +37,8 @@ jobs:
         # 大腦層只讀取本地 JSON，不需要外部金鑰
         run: python strategy_brain.py
 
-#      - name: 📢 步驟三：轉譯與推播層 (Notification Layer)
-#        env:
-#          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-#          LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
-#        run: python notification_layer.py
+      - name: 📢 步驟三：轉譯與推播層 (Notification Layer)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+        run: python notification_layer.py
