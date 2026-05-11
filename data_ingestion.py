@@ -210,21 +210,27 @@ def fetch_safety_indicators():
             cpi_raw = fred.get_series('CPIAUCSL')
             cpi_df = pd.DataFrame(cpi_raw, columns=['cpi'])
             cpi_df['cpi_yoy'] = cpi_df['cpi'].pct_change(12) * 100
-    
+            time.sleep(2)
             # 2. 抓取基準利率 (FEDFUNDS)
             fed_rate = fred.get_series('FEDFUNDS')
             time.sleep(2)
-            # 3. 整合最近半年的數據
+            # 💡 3. 新增：抓取非農就業人口 (PAYEMS)，並計算「每月新增人數」
+            nfp_raw = fred.get_series('PAYEMS')
+            nfp_diff = nfp_raw.diff() # 計算與上個月的差值 (新增了多少人)
+            time.sleep(2)
+            # 4. 整合最近半年的數據
             combined = pd.DataFrame({
                 'cpi_yoy': cpi_df['cpi_yoy'],
-                'fed_rate': fed_rate
+                'fed_rate': fed_rate,
+                'nfp_additions': nfp_diff # 💡 併入 NFP 數據
             }).dropna().tail(6)
     
             cleaned_data = {
                 "indicator": "Safety_Monitor",
                 "dates": combined.index.strftime('%Y-%m-%d').tolist(),
                 "cpi_yoy": combined['cpi_yoy'].tolist(),
-                "fed_rate": combined['fed_rate'].tolist()
+                "fed_rate": combined['fed_rate'].tolist(),
+                "nfp_additions": combined['nfp_additions'].tolist() # 💡 輸出給大腦
             }
     
             with open('safety_data.json', 'w') as f:
@@ -235,8 +241,8 @@ def fetch_safety_indicators():
         except Exception as e:
             print(f"⚠️ 第 {attempt + 1} 次抓取失敗: {e}")
             if attempt < max_retries - 1:
-                print("等待 10 秒後進行重試...")
-                time.sleep(8) # 💡 失敗的話，睡 10 秒再重新執行下一次迴圈
+                print("等待 4 秒後進行重試...")
+                time.sleep(4) # 💡 失敗的話，睡 4 秒再重新執行下一次迴圈
             else:
                 print("❌ FRED 重試達上限，放棄抓取。")
                 return False # 💡 3 次都失敗，才正式宣告死亡
