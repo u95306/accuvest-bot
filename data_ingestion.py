@@ -118,8 +118,8 @@ def fetch_and_save_macro_data():
             df = pd.DataFrame(data, columns=['new_orders'])
             df['yoy_growth'] = df['new_orders'].pct_change(periods=12) * 100
     
-            # 大腦其實只需要最近 3 個月的數據來判斷趨勢，我們過濾掉多餘雜訊
-            df = df.dropna().tail(3)
+            # 大腦其實只需要最近 6 個月的數據來判斷趨勢，我們過濾掉多餘雜訊
+            df = df.dropna().tail(6)
     
             # 將 DataFrame 轉換為乾淨的 Python 字典
             cleaned_data = {
@@ -138,7 +138,7 @@ def fetch_and_save_macro_data():
         except Exception as e:
             print(f"⚠️ 第 {attempt + 1} 次抓取失敗: {e}")
             if attempt < max_retries - 1:
-                print("等待 10 秒後進行重試...")
+                print("等待 8 秒後進行重試...")
                 time.sleep(8) # 💡 失敗的話，睡 10 秒再重新執行下一次迴圈
             else:
                 print("❌ FRED 重試達上限，放棄抓取。")
