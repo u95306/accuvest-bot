@@ -49,11 +49,11 @@ class AccuVestBrain:
         # 優先級 1：通膨斷路器 2.0 (Exception) - 結合 NFP 就業防呆
         # ==========================================
 
-        if len(rate_list) >= 3 and len(cpi_list) > 0:
+        if len(rate_list) >= 4 and len(cpi_list) > 0:
             current_cpi = cpi_list[-1]
 
-            # 判斷是否「連續且大幅度」升息 (連續兩個月皆升息)
-            is_aggressive_hiking = (rate_list[-1] > rate_list[-2]) and (rate_list[-2] > rate_list[-3])
+            # 判斷是否「暴力升息」：最新利率大於三個月前 (容許中間有未開會的平緩期)
+            is_aggressive_hiking = (rate_list[-1] > rate_list[-4])
             
             # 判斷就業市場是否已經崩潰 (最近兩個月 NFP 是否為負)
             is_labor_crashing = len(nfp_list) >= 2 and (nfp_list[-1] < 0 and nfp_list[-2] < 0)
@@ -121,7 +121,6 @@ class AccuVestBrain:
 
             # 攻擊條件：訂單指標轉好，且台灣景氣非藍燈 (>=17分，即黃藍燈以上)
             if is_order_3mma_up and tw_score >= 17:
-            
                 # 判斷資金面：Fed 是否已經停止升息或開始降息 (資金回流訊號)
                 is_fed_friendly = len(rate_list) >= 2 and (rate_list[-1] <= rate_list[-2])
                 
@@ -134,6 +133,15 @@ class AccuVestBrain:
                     "action": "【建議進場/抱緊】",
                     "asset_allocation": {"00881": 100, "00679B": 0, "CASH": 0},
                     "reason": reason_msg
+                })
+                return decision
+            else:
+                # 💡 數據轉弱，給出明確的空頭防守指令，而不是預設的「等待市場方向」
+                decision.update({
+                    "status": "BEAR_MARKET",
+                    "action": "【空頭衰退：出清觀望】",
+                    "asset_allocation": {"00881": 0, "00679B": 0, "CASH": 100},
+                    "reason": f"美國訂單 3MMA 動能疲軟或台灣燈號({tw_color})落入收縮區，基本面轉弱，建議保留現金。"
                 })
                 return decision
 
