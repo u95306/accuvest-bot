@@ -116,29 +116,29 @@ class AccuVestBrain:
                 is_order_3mma_up = order_values[-1] > 0 if order_values else False
 
 
-                tw_score = taiwan.get('score', 0)
-                tw_color = taiwan.get('color_name', '未知')
+            tw_score = taiwan.get('score', 0)
+            tw_color = taiwan.get('color_name', '未知')
 
-                # 攻擊條件：訂單指標轉好，且台灣景氣非藍燈 (>=17分，即黃藍燈以上)
-                if is_order_3mma_up and tw_score >= 17:
+            # 攻擊條件：訂單指標轉好，且台灣景氣非藍燈 (>=17分，即黃藍燈以上)
+            if is_order_3mma_up and tw_score >= 17:
+            
+                # 判斷資金面：Fed 是否已經停止升息或開始降息 (資金回流訊號)
+                is_fed_friendly = len(rate_list) >= 2 and (rate_list[-1] <= rate_list[-2])
                 
-                    # 判斷資金面：Fed 是否已經停止升息或開始降息 (資金回流訊號)
-                    is_fed_friendly = len(rate_list) >= 2 and (rate_list[-1] <= rate_list[-2])
-                    
-                    reason_msg = f"美國製造業訂單 3MMA 趨勢向上，且台灣燈號({tw_color})脫離低迷。"
-                    if is_fed_friendly:
-                        reason_msg += " 疊加 Fed 停止升息/降息，資金回流新興市場，強烈建議進場。"
-    
-                    decision.update({
-                        "status": "BULL_MARKET",
-                        "action": "【建議進場/抱緊】",
-                        "asset_allocation": {"00881": 100, "00679B": 0, "CASH": 0},
-                        "reason": reason_msg
-                    })
-                    return decision
-    
-            # 若以上皆未觸發，維持預設的 WAIT_AND_SEE
-            return decision
+                reason_msg = f"美國製造業訂單 3MMA 趨勢向上，且台灣燈號({tw_color})脫離低迷。"
+                if is_fed_friendly:
+                    reason_msg += " 疊加 Fed 停止升息/降息，資金回流新興市場，強烈建議進場。"
+
+                decision.update({
+                    "status": "BULL_MARKET",
+                    "action": "【建議進場/抱緊】",
+                    "asset_allocation": {"00881": 100, "00679B": 0, "CASH": 0},
+                    "reason": reason_msg
+                })
+                return decision
+
+        # 若以上皆未觸發，維持預設的 WAIT_AND_SEE
+        return decision
 
 # ==========================================
 # 執行與測試區塊
