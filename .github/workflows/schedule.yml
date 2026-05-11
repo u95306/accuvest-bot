@@ -33,9 +33,9 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: python data_ingestion.py
 
-#      - name: 🧠 步驟二：核心大腦層 (Strategy Brain)
+      - name: 🧠 步驟二：核心大腦層 (Strategy Brain)
         # 大腦層只讀取本地 JSON，不需要外部金鑰
-#        run: python strategy_brain.py
+        run: python strategy_brain.py
 
 #      - name: 📢 步驟三：轉譯與推播層 (Notification Layer)
 #        env:
