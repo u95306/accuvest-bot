@@ -107,7 +107,7 @@ def fetch_and_save_macro_data():
     只負責抓取 AMTMNO 數據，計算 YoY，並存成 JSON 給大腦讀取
     """
     print("📡 [資料層] 開始從 FRED 抓取美國製造業新訂單數據...")
-    ax_retries = 3 # 💡 設定最大重試次數
+    max_retries = 3 # 💡 設定最大重試次數
     for attempt in range(max_retries):
         try:
             data = fred.get_series('AMTMNO')
@@ -156,7 +156,7 @@ def fetch_and_save_yield_curve():
     抓取 10Y-2Y 殖利率利差，並存成 JSON 給大腦讀取
     """
     print("📡 [資料層] 開始從 FRED 抓取 10Y-2Y 殖利率利差...")
-    ax_retries = 3 # 💡 設定最大重試次數
+    max_retries = 3 # 💡 設定最大重試次數
     for attempt in range(max_retries):
         try:
             # T10Y2Y 是 FRED 官方計算好的 10年減2年 利差數據
@@ -203,7 +203,7 @@ def fetch_safety_indicators():
     抓取 CPI 與 基準利率，計算年增率與趨勢
     """
     print("📡 [資料層] 正在抓取通膨與利率數據...")
-    ax_retries = 3 # 💡 設定最大重試次數
+    max_retries = 3 # 💡 設定最大重試次數
     for attempt in range(max_retries):
         try:
             # 1. 抓取 CPI 並計算 YoY
