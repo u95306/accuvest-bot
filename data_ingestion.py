@@ -1,6 +1,3 @@
-# ==========================================
-# 模組 1: 資料獲取層 (國發會景氣燈號)
-# ==========================================
 import requests
 import zipfile
 import io
@@ -10,6 +7,9 @@ import os
 from fredapi import Fred
 import time
 
+# ==========================================
+# 模組 1: 資料獲取層 (國發會景氣燈號)
+# ==========================================
 def fetch_and_save_taiwan_light(zip_url):
     """
     從國發會 ZIP 檔抓取最新景氣燈號，並存成 JSON 給大腦讀取
@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
 
 # ==========================================
-# 模組 1: 資料獲取層 (data_ingestion)
+# 模組 2: 資料獲取層 (美國-進出口年增率 (YoY))
 # ==========================================
 
 # ⚠️ 請換上妳重新生成的新 API Key
@@ -107,41 +107,48 @@ def fetch_and_save_macro_data():
     只負責抓取 AMTMNO 數據，計算 YoY，並存成 JSON 給大腦讀取
     """
     print("📡 [資料層] 開始從 FRED 抓取美國製造業新訂單數據...")
-    try:
-        data = fred.get_series('AMTMNO')
-        time.sleep(2)
-        if data.empty:
-            return False
-
-        df = pd.DataFrame(data, columns=['new_orders'])
-        df['yoy_growth'] = df['new_orders'].pct_change(periods=12) * 100
-
-        # 大腦其實只需要最近 3 個月的數據來判斷趨勢，我們過濾掉多餘雜訊
-        df = df.dropna().tail(3)
-
-        # 將 DataFrame 轉換為乾淨的 Python 字典
-        cleaned_data = {
-            "indicator": "AMTMNO_YoY",
-            "dates": df.index.strftime('%Y-%m-%d').tolist(),
-            "values": df['yoy_growth'].tolist()
-        }
-
-        # 將乾淨的數據存成 JSON 檔案 (這就是解耦的關鍵媒介)
-        with open('macro_data.json', 'w') as f:
-            json.dump(cleaned_data, f, indent=4)
-
-        print("✅ [資料層] 數據清洗完成，已儲存至 macro_data.json")
-        return True
-
-    except Exception as e:
-        print(f"❌ [資料層] 抓取失敗: {e}")
-        return False
-
+    ax_retries = 3 # 💡 設定最大重試次數
+    for attempt in range(max_retries):
+        try:
+            data = fred.get_series('AMTMNO')
+            time.sleep(2)
+            if data.empty:
+                return False
+    
+            df = pd.DataFrame(data, columns=['new_orders'])
+            df['yoy_growth'] = df['new_orders'].pct_change(periods=12) * 100
+    
+            # 大腦其實只需要最近 3 個月的數據來判斷趨勢，我們過濾掉多餘雜訊
+            df = df.dropna().tail(3)
+    
+            # 將 DataFrame 轉換為乾淨的 Python 字典
+            cleaned_data = {
+                "indicator": "AMTMNO_YoY",
+                "dates": df.index.strftime('%Y-%m-%d').tolist(),
+                "values": df['yoy_growth'].tolist()
+            }
+    
+            # 將乾淨的數據存成 JSON 檔案 (這就是解耦的關鍵媒介)
+            with open('macro_data.json', 'w') as f:
+                json.dump(cleaned_data, f, indent=4)
+    
+            print("✅ [資料層] 數據清洗完成，已儲存至 macro_data.json")
+            return True
+    
+        except Exception as e:
+            print(f"⚠️ 第 {attempt + 1} 次抓取失敗: {e}")
+            if attempt < max_retries - 1:
+                print("等待 10 秒後進行重試...")
+                time.sleep(8) # 💡 失敗的話，睡 10 秒再重新執行下一次迴圈
+            else:
+                print("❌ FRED 重試達上限，放棄抓取。")
+                return False # 💡 3 次都失敗，才正式宣告死亡
+            
 # 執行資料抓取
 fetch_and_save_macro_data()
 
 # ==========================================
-# 模組 1: 資料獲取層 (新增殖利率利差)
+# 模組 3: 資料獲取層 (美國長短天期殖利率倒掛 (10Y-2Y))
 # ==========================================
 
 def fetch_and_save_yield_curve():
@@ -149,39 +156,46 @@ def fetch_and_save_yield_curve():
     抓取 10Y-2Y 殖利率利差，並存成 JSON 給大腦讀取
     """
     print("📡 [資料層] 開始從 FRED 抓取 10Y-2Y 殖利率利差...")
-    try:
-        # T10Y2Y 是 FRED 官方計算好的 10年減2年 利差數據
-        data = fred.get_series('T10Y2Y')
-        time.sleep(2)
-        if data.empty:
-            return False
-
-        df = pd.DataFrame(data, columns=['spread'])
-        # 利差數據天天更新，我們取最近 120 個交易日 (約半年) 來觀察趨勢
-        df = df.dropna().tail(120)
-
-        cleaned_data = {
-            "indicator": "Yield_Curve_10Y2Y",
-            "dates": df.index.strftime('%Y-%m-%d').tolist(),
-            "values": df['spread'].tolist()
-        }
-
-        # 存成獨立的 JSON 檔案
-        with open('yield_curve.json', 'w') as f:
-            json.dump(cleaned_data, f, indent=4)
-
-        print("✅ [資料層] 殖利率利差獲取成功，已儲存至 yield_curve.json")
-        return True
-
-    except Exception as e:
-        print(f"❌ [資料層] 抓取失敗: {e}")
-        return False
+    ax_retries = 3 # 💡 設定最大重試次數
+    for attempt in range(max_retries):
+        try:
+            # T10Y2Y 是 FRED 官方計算好的 10年減2年 利差數據
+            data = fred.get_series('T10Y2Y')
+            time.sleep(2)
+            if data.empty:
+                return False
+    
+            df = pd.DataFrame(data, columns=['spread'])
+            # 利差數據天天更新，我們取最近 120 個交易日 (約半年) 來觀察趨勢
+            df = df.dropna().tail(120)
+    
+            cleaned_data = {
+                "indicator": "Yield_Curve_10Y2Y",
+                "dates": df.index.strftime('%Y-%m-%d').tolist(),
+                "values": df['spread'].tolist()
+            }
+    
+            # 存成獨立的 JSON 檔案
+            with open('yield_curve.json', 'w') as f:
+                json.dump(cleaned_data, f, indent=4)
+    
+            print("✅ [資料層] 殖利率利差獲取成功，已儲存至 yield_curve.json")
+            return True
+    
+        except Exception as e:
+            print(f"⚠️ 第 {attempt + 1} 次抓取失敗: {e}")
+            if attempt < max_retries - 1:
+                print("等待 10 秒後進行重試...")
+                time.sleep(8) # 💡 失敗的話，睡 10 秒再重新執行下一次迴圈
+            else:
+                print("❌ FRED 重試達上限，放棄抓取。")
+                return False # 💡 3 次都失敗，才正式宣告死亡
 
 # 執行抓取
 fetch_and_save_yield_curve()
 
 # ==========================================
-# 模組 1: 資料獲取層 (新增 CPI 與 利率)
+# 模組 4: 資料獲取層 (新增 CPI 與 利率)
 # ==========================================
 
 def fetch_safety_indicators():
@@ -189,35 +203,42 @@ def fetch_safety_indicators():
     抓取 CPI 與 基準利率，計算年增率與趨勢
     """
     print("📡 [資料層] 正在抓取通膨與利率數據...")
-    try:
-        # 1. 抓取 CPI 並計算 YoY
-        cpi_raw = fred.get_series('CPIAUCSL')
-        cpi_df = pd.DataFrame(cpi_raw, columns=['cpi'])
-        cpi_df['cpi_yoy'] = cpi_df['cpi'].pct_change(12) * 100
-
-        # 2. 抓取基準利率 (FEDFUNDS)
-        fed_rate = fred.get_series('FEDFUNDS')
-        time.sleep(2)
-        # 3. 整合最近半年的數據
-        combined = pd.DataFrame({
-            'cpi_yoy': cpi_df['cpi_yoy'],
-            'fed_rate': fed_rate
-        }).dropna().tail(6)
-
-        cleaned_data = {
-            "indicator": "Safety_Monitor",
-            "dates": combined.index.strftime('%Y-%m-%d').tolist(),
-            "cpi_yoy": combined['cpi_yoy'].tolist(),
-            "fed_rate": combined['fed_rate'].tolist()
-        }
-
-        with open('safety_data.json', 'w') as f:
-            json.dump(cleaned_data, f, indent=4)
-
-        print("✅ [資料層] 安全監控數據已儲存。")
-        return True
-    except Exception as e:
-        print(f"❌ [資料層] 抓取失敗: {e}")
-        return False
+    ax_retries = 3 # 💡 設定最大重試次數
+    for attempt in range(max_retries):
+        try:
+            # 1. 抓取 CPI 並計算 YoY
+            cpi_raw = fred.get_series('CPIAUCSL')
+            cpi_df = pd.DataFrame(cpi_raw, columns=['cpi'])
+            cpi_df['cpi_yoy'] = cpi_df['cpi'].pct_change(12) * 100
+    
+            # 2. 抓取基準利率 (FEDFUNDS)
+            fed_rate = fred.get_series('FEDFUNDS')
+            time.sleep(2)
+            # 3. 整合最近半年的數據
+            combined = pd.DataFrame({
+                'cpi_yoy': cpi_df['cpi_yoy'],
+                'fed_rate': fed_rate
+            }).dropna().tail(6)
+    
+            cleaned_data = {
+                "indicator": "Safety_Monitor",
+                "dates": combined.index.strftime('%Y-%m-%d').tolist(),
+                "cpi_yoy": combined['cpi_yoy'].tolist(),
+                "fed_rate": combined['fed_rate'].tolist()
+            }
+    
+            with open('safety_data.json', 'w') as f:
+                json.dump(cleaned_data, f, indent=4)
+    
+            print("✅ [資料層] 安全監控數據已儲存。")
+            return True
+        except Exception as e:
+            print(f"⚠️ 第 {attempt + 1} 次抓取失敗: {e}")
+            if attempt < max_retries - 1:
+                print("等待 10 秒後進行重試...")
+                time.sleep(8) # 💡 失敗的話，睡 10 秒再重新執行下一次迴圈
+            else:
+                print("❌ FRED 重試達上限，放棄抓取。")
+                return False # 💡 3 次都失敗，才正式宣告死亡
 
 fetch_safety_indicators()
