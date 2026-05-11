@@ -42,25 +42,34 @@ class AccuVestBrain:
         }
 
         # ==========================================
-        # 優先級 1：通膨斷路器 (Exception) - 防止股債雙殺
+        # 優先級 1：通膨斷路器 2.0 (Exception) - 結合 NFP 就業防呆
         # ==========================================
         if safety:
             cpi_list = safety.get('cpi_yoy', [])
             rate_list = safety.get('fed_rate', [])
+            nfp_list = safety.get('nfp_additions', [])
 
             if len(cpi_list) > 0 and len(rate_list) > 1:
                 current_cpi = cpi_list[-1]
                 is_rate_hiking = rate_list[-1] > rate_list[-2]
 
+                # 判斷就業市場是否已經崩潰 (最近兩個月 NFP 是否為負)
+                is_labor_crashing = len(nfp_list) >= 2 and (nfp_list[-1] < 0 and nfp_list[-2] < 0)
+
                 # 若 CPI >= 4% 且處於升息循環
                 if current_cpi >= 4.0 and is_rate_hiking:
-                    decision.update({
-                        "status": "STAGFLATION_CRASH",
-                        "action": "【全面清倉】",
-                        "asset_allocation": {"00881": 0, "00679B": 0, "CASH": 100},
-                        "reason": f"偵測到高通膨 ({current_cpi:.1f}%) 且聯準會持續升息，啟動 2022 斷路器避開股債雙殺。"
-                    })
-                    return decision # 觸發最高警報，直接返回，不看其他指標
+                    # 💡 加入 NFP 雙重確認：如果就業已經崩潰，聯準會將轉向，取消清倉指令
+                    if is_labor_crashing:
+                        print("🧠 [大腦推演] 偵測到高通膨，但 NFP 連續負成長，預期聯準會即將降息救市，解除清倉斷路器。")
+                        # 不 return decision，讓程式繼續往下走到「優先級 2」去買美債避險
+                    else:
+                        decision.update({
+                            "status": "STAGFLATION_CRASH",
+                            "action": "【全面清倉】",
+                            "asset_allocation": {"00881": 0, "00679B": 0, "CASH": 100},
+                            "reason": f"偵測到高通膨 ({current_cpi:.1f}%) 且升息，且就業尚未衰退，啟動斷路器避開股債雙殺。"
+                        })
+                        return decision # 觸發最高警報，直接返回，不看其他指標
 
         # ==========================================
         # 優先級 2：殖利率避險 (Defense) - 預警經濟衰退
