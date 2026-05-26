@@ -89,16 +89,40 @@ def get_gemini_briefing():
     3. 語氣要堅定，不要使用「或許」、「可能」等模稜兩可的詞彙。
     """
 
+    # --- 步驟 D：組合寫給 Gemini 的 Prompt ---
+    # (前面組裝 prompt 的程式碼維持不變...)
+
     try:
-        # 呼叫 Gemini (使用較為穩定的 gemini-2.5-flash 模型)
+        print("🧠 嘗試使用 gemini-2.5-flash 進行轉譯...")
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,
         )
         return response.text
+        
     except Exception as e:
-        print(f"❌ Gemini API 錯誤: {e}")
-        return None
+        error_message = str(e)
+        print(f"⚠️ gemini-2.5-flash 呼叫失敗: {error_message}")
+        
+        # 判斷是否為 503 錯誤 (或者其他伺服器端錯誤)
+        if "503" in error_message or "Service Unavailable" in error_message:
+            print("🔄 偵測到 503 錯誤，啟動降級機制，切換至 gemini-1.5-flash...")
+            try:
+                # 備用方案：使用 gemini-1.5-flash (注意：Google 目前沒有 3.5-flash，備用通常選前一代或 lite)
+                fallback_response = client.models.generate_content(
+                    model='gemini-3.5-flash', 
+                    contents=prompt,
+                )
+                print("✅ 備用模型轉譯成功！")
+                return fallback_response.text
+            except Exception as fallback_error:
+                print(f"❌ 備用模型也失敗了: {fallback_error}")
+                # 如果連備用都失敗，回傳一個系統預設的安全字串，確保 LINE 還是會響
+                return f"【系統通知】\n決策：{final_action}\n(備註：AI 轉譯伺服器暫時無回應，請直接查看大腦原始決策)"
+        else:
+            # 如果不是 503 錯誤 (例如 API Key 錯誤)，就直接報錯，不盲目重試
+            print("❌ 發生非 503 的嚴重錯誤，請檢查系統。")
+            return f"【系統通知】\n決策：{final_action}\n(備註：AI 轉譯發生異常)"
 
 
 def broadcast_to_line(message_text):
