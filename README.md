@@ -20,7 +20,6 @@
 - 透過 LINE Messaging API 執行單向廣播推播。
 - **降級機制 (Fallback)**：預設主力模型為 `gemini-2.5-flash`，若遇伺服器 `503 Service Unavailable` 異常，系統將自動降級切換至 `gemini-1.5-flash`，確保每日晨報不中斷。
 
----
 
 ## 基礎建設與排程 (CI/CD & Cron)
 - **精準定時觸發**：由於 GitHub 內建 cron 存在尖峰壅塞延遲，本系統將排程指揮權轉交予 **cron-job.org**。透過精準的 Webhook (`workflow_dispatch`) 喚醒 GitHub Actions 執行自動化。
