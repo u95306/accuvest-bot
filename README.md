@@ -23,9 +23,9 @@
 ---
 
 ## 基礎建設與排程 (CI/CD & Cron)
-- 依賴 **GitHub Actions** (`schedule.yml`) 進行無人值守自動化。
-- **時間偏移 (Jitter)**：刻意避開全球 API 請求壅塞的整點，設定於台灣時間 `08:37` 執行。
-- **交接聯絡簿機制**：結合 `actions/cache` 設計狀態快取。若早盤因外部環境引發 Hard Fail，系統將會利用狀態標記，於中午 `12:37` 自動執行降級備用排程補發。
+- **精準定時觸發**：由於 GitHub 內建 cron 存在尖峰壅塞延遲，本系統將排程指揮權轉交予 **cron-job.org**。透過精準的 Webhook (`workflow_dispatch`) 喚醒 GitHub Actions 執行自動化。
+- **時間偏移 (Jitter)**：刻意避開全球 API 請求壅塞的整點，設定於台灣時間 `08:37` 執行早盤分析。
+- **交接聯絡簿機制**：結合 `actions/cache` 設計狀態快取。若早盤因外部環境引發 Hard Fail，系統將會利用狀態標記，於中午 `12:37` 由備用排程自動執行降級補發。
 
 ## 環境變數與機密配置 (Environment Variables)
 部署前請確保於本地 `.env` 或 GitHub Repository Secrets 中配置以下金鑰：
