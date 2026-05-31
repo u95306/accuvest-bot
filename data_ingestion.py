@@ -6,6 +6,9 @@ import json
 import os
 from fredapi import Fred
 import time
+import sys  # 💡 新增：用來發送中斷信號 (Hard Fail)
+# 💡 新增：直接從推播層借用「嘴巴」
+from notification_layer import broadcast_to_line
 
 # ==========================================
 # 模組 1: 資料獲取層 (國發會景氣燈號)
@@ -87,164 +90,155 @@ def fetch_and_save_taiwan_light(zip_url):
         print(f"❌ [資料層] 抓取或處理失敗: {e}")
         return False
 
-# --- 執行資料抓取 ---
-if __name__ == "__main__":
-    ZIP_URL = "https://ws.ndc.gov.tw/Download.ashx?u=LzAwMS9hZG1pbmlzdHJhdG9yLzEwL3JlbGZpbGUvNTc4MS82MzkyL2VhMjM1YmQ5LWQwNTItNGE2OS1hYmZjLWQ1Yzc4NWQzZDBlMi56aXA%3d&n=5pmv5rCj5oyH5qiZ5Y%2bK54eI6JmfLnppcA%3d%3d&icon=.zip"
-    fetch_and_save_taiwan_light(ZIP_URL)
 
 
+# ==========================================
+# 核心引擎：FRED 安全抓取與防護網 (寫一次就好)
+# ==========================================
+def fetch_fred_with_retry(fetch_logic_func, module_name):
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            # 讓外面的函數自己決定要抓什麼、算什麼
+            return fetch_logic_func()
+        except Exception as e:
+            print(f"⚠️ [{module_name}] 第 {attempt + 1} 次失敗: {e}")
+            if attempt < max_retries - 1:
+                print("等待 10 秒後進行重試...")
+                time.sleep(8) # 💡 失敗的話，睡 8 秒再重新執行下一次迴圈 
+            else:
+                print(f"❌ [{module_name}] 重試達上限。")
+                error_msg = f"【系統緊急通知】🚨\nAccuVest {module_name} 發生異常...\n將交接至 12:37 降級重試。"
+                broadcast_to_line(error_msg)
+                sys.exit(1)
+
+
+# ⚠️ FRED API Key
+FRED_API_KEY = os.environ.get("FRED_API_KEY")
+fred = Fred(api_key=FRED_API_KEY)
 
 # ==========================================
 # 模組 2: 資料獲取層 (美國-進出口年增率 (YoY))
 # ==========================================
+           
+def logic_macro_data():
+    data = fred.get_series('AMTMNO')
+    time.sleep(2)
+    if data.empty:
+        return False
 
-# ⚠️ 請換上妳重新生成的新 API Key
-FRED_API_KEY = os.environ.get("FRED_API_KEY")
-fred = Fred(api_key=FRED_API_KEY)
+    df = pd.DataFrame(data, columns=['new_orders'])
+    df['yoy_growth'] = df['new_orders'].pct_change(periods=12, fill_method=None) * 100
+
+    # 大腦其實只需要最近 6 個月的數據來判斷趨勢，我們過濾掉多餘雜訊
+    df = df.dropna().tail(6)
+
+    # 將 DataFrame 轉換為乾淨的 Python 字典
+    cleaned_data = {
+        "indicator": "AMTMNO_YoY",
+        "dates": df.index.strftime('%Y-%m-%d').tolist(),
+        "values": df['yoy_growth'].tolist()
+    }
+
+    # 將乾淨的數據存成 JSON 檔案 (這就是解耦的關鍵媒介)
+    with open('macro_data.json', 'w') as f:
+        json.dump(cleaned_data, f, indent=4)
+
+    print("✅ [資料層] 數據清洗完成，已儲存至 macro_data.json")
+    return True
 
 def fetch_and_save_macro_data():
-    """
-    只負責抓取 AMTMNO 數據，計算 YoY，並存成 JSON 給大腦讀取
-    """
-    print("📡 [資料層] 開始從 FRED 抓取美國製造業新訂單數據...")
-    max_retries = 3 # 💡 設定最大重試次數
-    for attempt in range(max_retries):
-        try:
-            data = fred.get_series('AMTMNO')
-            time.sleep(2)
-            if data.empty:
-                return False
-    
-            df = pd.DataFrame(data, columns=['new_orders'])
-            df['yoy_growth'] = df['new_orders'].pct_change(periods=12) * 100
-    
-            # 大腦其實只需要最近 6 個月的數據來判斷趨勢，我們過濾掉多餘雜訊
-            df = df.dropna().tail(6)
-    
-            # 將 DataFrame 轉換為乾淨的 Python 字典
-            cleaned_data = {
-                "indicator": "AMTMNO_YoY",
-                "dates": df.index.strftime('%Y-%m-%d').tolist(),
-                "values": df['yoy_growth'].tolist()
-            }
-    
-            # 將乾淨的數據存成 JSON 檔案 (這就是解耦的關鍵媒介)
-            with open('macro_data.json', 'w') as f:
-                json.dump(cleaned_data, f, indent=4)
-    
-            print("✅ [資料層] 數據清洗完成，已儲存至 macro_data.json")
-            return True
-    
-        except Exception as e:
-            print(f"⚠️ 第 {attempt + 1} 次抓取失敗: {e}")
-            if attempt < max_retries - 1:
-                print("等待 8 秒後進行重試...")
-                time.sleep(8) # 💡 失敗的話，睡 10 秒再重新執行下一次迴圈
-            else:
-                print("❌ FRED 重試達上限，放棄抓取。")
-                return False # 💡 3 次都失敗，才正式宣告死亡
-            
-# 執行資料抓取
-fetch_and_save_macro_data()
+    # 只要呼叫引擎，把邏輯塞進去，防呆機制自動啟動！
+    fetch_fred_with_retry(logic_macro_data, "進出口年增率")
+
 
 # ==========================================
 # 模組 3: 資料獲取層 (美國長短天期殖利率倒掛 (10Y-2Y))
 # ==========================================
 
-def fetch_and_save_yield_curve():
-    """
-    抓取 10Y-2Y 殖利率利差，並存成 JSON 給大腦讀取
-    """
-    print("📡 [資料層] 開始從 FRED 抓取 10Y-2Y 殖利率利差...")
-    max_retries = 3 # 💡 設定最大重試次數
-    for attempt in range(max_retries):
-        try:
-            # T10Y2Y 是 FRED 官方計算好的 10年減2年 利差數據
-            data = fred.get_series('T10Y2Y')
-            time.sleep(2)
-            if data.empty:
-                return False
-    
-            df = pd.DataFrame(data, columns=['spread'])
-            # 利差數據天天更新，我們取最近 120 個交易日 (約半年) 來觀察趨勢
-            df = df.dropna().tail(120)
-    
-            cleaned_data = {
-                "indicator": "Yield_Curve_10Y2Y",
-                "dates": df.index.strftime('%Y-%m-%d').tolist(),
-                "values": df['spread'].tolist()
-            }
-    
-            # 存成獨立的 JSON 檔案
-            with open('yield_curve.json', 'w') as f:
-                json.dump(cleaned_data, f, indent=4)
-    
-            print("✅ [資料層] 殖利率利差獲取成功，已儲存至 yield_curve.json")
-            return True
-    
-        except Exception as e:
-            print(f"⚠️ 第 {attempt + 1} 次抓取失敗: {e}")
-            if attempt < max_retries - 1:
-                print("等待 10 秒後進行重試...")
-                time.sleep(8) # 💡 失敗的話，睡 10 秒再重新執行下一次迴圈
-            else:
-                print("❌ FRED 重試達上限，放棄抓取。")
-                return False # 💡 3 次都失敗，才正式宣告死亡
+def logic_yield_curve():
+    # T10Y2Y 是 FRED 官方計算好的 10年減2年 利差數據
+    data = fred.get_series('T10Y2Y')
+    time.sleep(2)
+    if data.empty:
+        return False
+
+    df = pd.DataFrame(data, columns=['spread'])
+    # 利差數據天天更新，我們取最近 120 個交易日 (約半年) 來觀察趨勢
+    df = df.dropna().tail(120)
+
+    cleaned_data = {
+        "indicator": "Yield_Curve_10Y2Y",
+        "dates": df.index.strftime('%Y-%m-%d').tolist(),
+        "values": df['spread'].tolist()
+    }
+
+    # 存成獨立的 JSON 檔案
+    with open('yield_curve.json', 'w') as f:
+        json.dump(cleaned_data, f, indent=4)
+
+    print("✅ [資料層] 殖利率利差獲取成功，已儲存至 yield_curve.json")
+    return True
 
 # 執行抓取
-fetch_and_save_yield_curve()
+def fetch_and_save_yield_curve():
+    fetch_fred_with_retry(logic_yield_curve, "美國長短天期殖利率倒掛")
 
 # ==========================================
 # 模組 4: 資料獲取層 (新增 CPI 與 利率)
 # ==========================================
 
-def fetch_safety_indicators():
-    """
-    抓取 CPI 與 基準利率，計算年增率與趨勢
-    """
-    print("📡 [資料層] 正在抓取通膨與利率數據...")
-    max_retries = 3 # 💡 設定最大重試次數
-    for attempt in range(max_retries):
-        try:
-            # 1. 抓取 CPI 並計算 YoY
-            cpi_raw = fred.get_series('CPIAUCSL')
-            cpi_df = pd.DataFrame(cpi_raw, columns=['cpi'])
-            cpi_df['cpi_yoy'] = cpi_df['cpi'].pct_change(12) * 100
-            time.sleep(2)
-            # 2. 抓取基準利率 (FEDFUNDS)
-            fed_rate = fred.get_series('FEDFUNDS')
-            time.sleep(2)
-            # 💡 3. 新增：抓取非農就業人口 (PAYEMS)，並計算「每月新增人數」
-            nfp_raw = fred.get_series('PAYEMS')
-            nfp_diff = nfp_raw.diff() # 計算與上個月的差值 (新增了多少人)
-            time.sleep(2)
-            # 4. 整合最近半年的數據
-            combined = pd.DataFrame({
-                'cpi_yoy': cpi_df['cpi_yoy'],
-                'fed_rate': fed_rate,
-                'nfp_additions': nfp_diff # 💡 併入 NFP 數據
-            }).dropna().tail(6)
-    
-            cleaned_data = {
-                "indicator": "Safety_Monitor",
-                "dates": combined.index.strftime('%Y-%m-%d').tolist(),
-                "cpi_yoy": combined['cpi_yoy'].tolist(),
-                "fed_rate": combined['fed_rate'].tolist(),
-                "nfp_additions": combined['nfp_additions'].tolist() # 💡 輸出給大腦
-            }
-    
-            with open('safety_data.json', 'w') as f:
-                json.dump(cleaned_data, f, indent=4)
-    
-            print("✅ [資料層] 安全監控數據已儲存。")
-            return True
-        except Exception as e:
-            print(f"⚠️ 第 {attempt + 1} 次抓取失敗: {e}")
-            if attempt < max_retries - 1:
-                print("等待 4 秒後進行重試...")
-                time.sleep(4) # 💡 失敗的話，睡 4 秒再重新執行下一次迴圈
-            else:
-                print("❌ FRED 重試達上限，放棄抓取。")
-                return False # 💡 3 次都失敗，才正式宣告死亡
+def logic_indicators():
+    cpi_raw = fred.get_series('CPIAUCSL')
+    cpi_df = pd.DataFrame(cpi_raw, columns=['cpi'])
+    cpi_df['cpi_yoy'] = cpi_df['cpi'].pct_change(12, fill_method=None) * 100
+    time.sleep(2)
+    # 2. 抓取基準利率 (FEDFUNDS)
+    fed_rate = fred.get_series('FEDFUNDS')
+    time.sleep(2)
+    # 💡 3. 新增：抓取非農就業人口 (PAYEMS)，並計算「每月新增人數」
+    nfp_raw = fred.get_series('PAYEMS')
+    nfp_diff = nfp_raw.diff() # 計算與上個月的差值 (新增了多少人)
+    time.sleep(2)
+    # 4. 整合最近半年的數據
+    combined = pd.DataFrame({
+        'cpi_yoy': cpi_df['cpi_yoy'],
+        'fed_rate': fed_rate,
+        'nfp_additions': nfp_diff # 💡 併入 NFP 數據
+    }).dropna().tail(6)
 
-fetch_safety_indicators()
+    cleaned_data = {
+        "indicator": "Safety_Monitor",
+        "dates": combined.index.strftime('%Y-%m-%d').tolist(),
+        "cpi_yoy": combined['cpi_yoy'].tolist(),
+        "fed_rate": combined['fed_rate'].tolist(),
+        "nfp_additions": combined['nfp_additions'].tolist() # 💡 輸出給大腦
+    }
+
+    with open('safety_data.json', 'w') as f:
+        json.dump(cleaned_data, f, indent=4)
+
+    print("✅ [資料層] 安全監控數據已儲存。")
+    return True
+
+def fetch_safety_indicators():
+    fetch_fred_with_retry(logic_indicators, "通膨與利率")
+
+
+
+# ==========================================
+# 主流程控制器 (Main Execution)
+# ==========================================
+if __name__ == "__main__":
+    print("🚀 啟動 AccuVest 資料獲取引擎...")
+    
+    # 國發會景氣燈號 (ZIP_URL 變數也可以移下來這裡集中管理)
+    ZIP_URL = "https://ws.ndc.gov.tw/Download.ashx?u=LzAwMS9hZG1pbmlzdHJhdG9yLzEwL3JlbGZpbGUvNTc4MS82MzkyL2VhMjM1YmQ5LWQwNTItNGE2OS1hYmZjLWQ1Yzc4NWQzZDBlMi56aXA%3d&n=5pmv5rCj5oyH5qiZ5Y%2bK54eI6JmfLnppcA%3d%3d&icon=.zip"
+    fetch_and_save_taiwan_light(ZIP_URL)
+    
+    # FRED 總經指標群
+    fetch_and_save_macro_data()
+    fetch_and_save_yield_curve()
+    fetch_safety_indicators()
+    
+    print("🏁 所有資料獲取完畢")

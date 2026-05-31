@@ -1,0 +1,19 @@
+# 虛擬環境 (Virtual Environments)
+.venv/
+venv/
+env/
+ENV/
+
+# Python 快取檔案
+__pycache__/
+*.py[cod]
+*$py.class
+
+# VS Code 設定與暫存檔
+.vscode/
+
+# 環境變數與機密金鑰 (絕對不能上傳！)
+.env
+
+# 妳可能不想上傳的資料暫存檔 (視妳的需求而定)
+*.json
