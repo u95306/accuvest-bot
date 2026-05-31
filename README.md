@@ -37,7 +37,11 @@ LINE_CHANNEL_TOKEN=your_line_bot_token_here
 ```
 ## 執行與測試 (Local Testing)
 在本地環境測試時，請嚴格按照以下順序執行，以確保 JSON 資料流傳遞正確：
-
+### 0. 安裝環境依賴 (Install Dependencies)
+請確保已啟動虛擬環境，並安裝所有必要套件（包含 pandas, fredapi, google-genai, python-dotenv, pyarrow 等）：
+```Bash
+pip install -r requirements.txt
+```
 ### 1. 獲取數據並產生 macro_data.json 等資料
 `python data_ingestion.py`
 
