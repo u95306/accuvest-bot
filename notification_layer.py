@@ -2,6 +2,7 @@ import os
 import requests
 import json
 from google import genai
+import traceback
 
 # 從環境變數安全地讀取鑰匙 (不要把真實字串寫在這裡了！)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -44,6 +45,8 @@ def get_gemini_briefing():
     yield_data = load_json_data('yield_curve.json')
     safety = load_json_data('safety_data.json')
     taiwan = load_json_data('taiwan_light.json')
+    etf_data = load_json_data('top_etfs.json')
+
 
     # --- 步驟 B：動態提取最新盤面數據 (加入防呆機制) ---
     try:
@@ -54,10 +57,23 @@ def get_gemini_briefing():
     except (KeyError, IndexError):
         orders_yoy, yield_spread, cpi, tw_light = "讀取異常", "讀取異常", "讀取異常", "讀取異常"
 
+    etf_recommendation = "無（維持現金或觀望）"
+    if etf_data and len(etf_data) > 0:
+        etf_lines = []
+        for i, etf in enumerate(etf_data, 1): # enumerate(, 1) 讓編號從 1 開始
+            code = etf.get('Code', '未知')
+            name = etf.get('ETF名稱', '未知')
+            score = etf.get('綜合動能分數', 0.0)
+            etf_lines.append(f"  {i}. {code} {name} (動能: {score})")
+        
+        # 將陣列組合成換行的字串
+        etf_recommendation = "\n" + "\n".join(etf_lines)
+
     # --- 步驟 C：提取大腦的核心決策 ---
     final_action = decision.get("action", "【無明確指令】")
     reasoning = decision.get("reason", "無")
     allocation = decision.get("asset_allocation", "等待市場訊號")
+
 
     # 組裝盤面數據字串
     raw_data_string = f"""
@@ -66,6 +82,7 @@ def get_gemini_briefing():
     - 美國 CPI: {cpi}%
     - 台灣燈號: {tw_light}
     - 資產配置: {allocation}
+    - 今日強勢嚴選 Top 5: {etf_recommendation}
     """
 
     # --- 步驟 D：組合寫給 Gemini 的 Prompt ---
@@ -79,38 +96,43 @@ def get_gemini_briefing():
     【系統輸入】
     1. 核心決策：{final_action}
     2. 決策主因：{reasoning}
-    3. 當前盤面數據：\n{raw_data_string}
+    3. 當前盤面與精選標的：\n{raw_data_string}
 
     【輸出要求】
-    請以冷靜、客觀、極簡的工程師風格，寫一段 80 字以內的推播文案。
+    請以冷靜、客觀、極簡的工程師風格撰寫推播文案。
     結構必須是：
     1. 第一行直接印出核心決策。
-    2. 第二段用當前盤面數據簡單解釋這個決策，並明確列出資產配置建議。
-    3. 語氣要堅定，不要使用「或許」、「可能」等模稜兩可的詞彙。
+    2. 第二段用當前盤面數據簡單解釋這個決策，並列出資產配置。
+    3. 🌟 如果決策是「建議進場」或「強制觀望」，請在最後一段【完整條列出這 5 檔】強勢嚴選標的與分數。
+    4. 語氣要堅定，排版要乾淨俐落，方便在手機上閱讀。
     """
 
     # --- 步驟 D：組合寫給 Gemini 的 Prompt ---
     # (前面組裝 prompt 的程式碼維持不變...)
 
     try:
-        print("🧠 嘗試使用 gemini-2.5-flash 進行轉譯...")
+        print("🧠 嘗試使用 gemini-3.5-flash 進行轉譯...")
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.5-flash',
             contents=prompt,
         )
         return response.text
         
     except Exception as e:
+        print("🚨 [系統底層錯誤報告] 🚨")
+        traceback.print_exc() 
+        print("------------------------")
+        
         error_message = str(e)
-        print(f"⚠️ gemini-2.5-flash 呼叫失敗: {error_message}")
+        print(f"⚠️ gemini-3.5-flash 呼叫失敗: {error_message}")
         
         # 判斷是否為 503 錯誤 (或者其他伺服器端錯誤)
         if "503" in error_message or "Service Unavailable" in error_message:
-            print("🔄 偵測到 503 錯誤，啟動降級機制，切換至 gemini-1.5-flash...")
+            print("🔄 偵測到 503 錯誤，啟動降級機制，切換至 gemini-3.5-flash...")
             try:
-                # 備用方案：使用 gemini-1.5-flash (注意：Google 目前沒有 3.5-flash，備用通常選前一代或 lite)
+                # 備用方案：使用 gemini-2.5-flash (注意：Google 目前沒有 2.5-flash，備用通常選前一代或 lite)
                 fallback_response = client.models.generate_content(
-                    model='gemini-3.5-flash', 
+                    model='gemini-2.5-flash', 
                     contents=prompt,
                 )
                 print("✅ 備用模型轉譯成功！")
