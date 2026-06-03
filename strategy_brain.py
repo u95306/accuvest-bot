@@ -37,7 +37,7 @@ class AccuVestBrain:
         decision = {
             "status": "WAIT_AND_SEE",
             "action": "保持觀望",
-            "asset_allocation": {"00881": 0, "00679B": 0, "CASH": 100},
+            "asset_allocation": {"股票型基金": 0, "美國債券": 0, "現金": 100},
             "reason": "指標數據不完整或訊號不明確，等待市場方向。"
         }
 
@@ -68,7 +68,7 @@ class AccuVestBrain:
                     decision.update({
                         "status": "STAGFLATION_CRASH",
                         "action": "【全面清倉】",
-                        "asset_allocation": {"00881": 0, "00679B": 0, "CASH": 100},
+                        "asset_allocation": {"股票型基金": 0, "美國債卷": 0, "現金": 100},
                         "reason": f"偵測到高通膨 ({current_cpi:.1f}%) 且升息，且就業尚未衰退，啟動斷路器避開股債雙殺。"
                     })
                     return decision # 觸發最高警報，直接返回，不看其他指標
@@ -92,7 +92,7 @@ class AccuVestBrain:
                     decision.update({
                         "status": "RECESSION_CRASH",
                         "action": "【緊急避險】",
-                        "asset_allocation": {"00881": 0, "00679B": 100, "CASH": 0},
+                        "asset_allocation": {"股票型基金": 0, "美國債券": 100, "現金": 0},
                         "reason": "殖利率解除倒掛，且 Fed 開始預防性降息，實體經濟確認步入衰退，資金轉入美債避險。"
                     })
                     return decision
@@ -131,7 +131,7 @@ class AccuVestBrain:
                 decision.update({
                     "status": "BULL_MARKET",
                     "action": "【建議進場/抱緊】",
-                    "asset_allocation": {"00881": 100, "00679B": 0, "CASH": 0},
+                    "asset_allocation": {"股票型基金": 100, "美國債券": 0, "現金": 0},
                     "reason": reason_msg
                 })
                 return decision
@@ -140,7 +140,7 @@ class AccuVestBrain:
                 decision.update({
                     "status": "BEAR_MARKET",
                     "action": "【空頭衰退：出清觀望】",
-                    "asset_allocation": {"00881": 0, "00679B": 0, "CASH": 100},
+                    "asset_allocation": {"股票型基金": 0, "美國債券": 0, "現金": 100},
                     "reason": f"美國訂單 3MMA 動能疲軟或台灣燈號({tw_color})落入收縮區，基本面轉弱，建議保留現金。"
                 })
                 return decision

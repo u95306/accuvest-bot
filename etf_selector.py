@@ -102,6 +102,15 @@ if __name__ == "__main__":
         display_cols = ['Code', 'ETF名稱', '近120日漲幅(%)', '近60日漲幅(%)', '近20日漲幅(%)', '綜合動能分數']
         # 🌟 確保存在欄位才印出，防止終端機當機
         existing_cols = [c for c in display_cols if c in final_attack_list.columns]
-        print(final_attack_list[existing_cols].head(5).to_string())
+        sort_target = '' 
+        
+        # 進行重新排序：ascending=False 代表「由大到小(降冪)」
+        if sort_target in final_attack_list.columns:
+            sorted_list = final_attack_list.sort_values(by=sort_target, ascending=False)
+            print(f"\n📊 目前排序依據：【{sort_target}】")
+            print(sorted_list[existing_cols].head(20).to_string())
+        else:
+            print(f"⚠️ 找不到 {sort_target} 欄位，維持預設排序。")
+            print(final_attack_list[existing_cols].head(20).to_string())
     else:
         print("❌ 系統中斷：無法從資料獲取層取得有效名單。")
