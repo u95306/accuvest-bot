@@ -54,13 +54,16 @@ jobs:
           echo "📡 開始執行資料獲取層..."
           python data_ingestion.py
           
-          echo "🧠 開始執行核心大腦層..."
+          echo "🧠 開始執行核心大腦層 (總經決策)..."
           python strategy_brain.py
+          
+          echo "🎯 開始執行 ETF 嚴選層 (規模/流動性/動能決策)..."
+          python etf_selector.py
           
           echo "📢 開始執行轉譯與推播層..."
           python notification_layer.py
           
-          # 若以上三行都順利跑完，代表今天任務圓滿達成，建立成功標記
+          # 若以上四行都順利跑完，代表今天任務圓滿達成，建立成功標記
           touch success.flag
           echo "✅ 系統執行完畢，已建立成功打卡單 (success.flag)"
 
