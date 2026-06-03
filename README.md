@@ -9,18 +9,22 @@
 - 將清洗後的指標轉換為乾淨的 JSON 檔案，供大腦層讀取。
 - **容錯機制**：內建「指數退避 (Exponential Backoff)」重試邏輯，有效應對 API `504 Gateway Timeout`。若達重試上限，將觸發 `sys.exit(1)` 主動報錯，並透過 LINE 提早發送緊急信號彈。
 
-### 2. 🧠 核心大腦：邏輯決策層 (`strategy_brain.py`)
+### 2. 🎯 量化選股引擎：季線動能層 (`etf_selector.py`)
+- 取代傳統的單一標的死抱策略，導入「絕對趨勢」與「相對動能」雙重濾網。
+- 監控前 20 大台股與美債 ETF。當系統觸發多頭訊號時，自動剔除跌破 60MA (季線) 的弱勢標的，並篩選出過去 60 天內累積報酬率最高的前 3 名強勢 ETF，交由大腦進行動態配置。
+
+### 3. 🧠 核心大腦：邏輯決策層 (`strategy_brain.py`)
 - 拋棄主觀預測，以 Python 實作嚴格的優先級決策樹 (Priority Logic)。
 - **優先級 1 - 通膨斷路器**：偵測惡性通膨 (CPI >= 4.0) 疊加暴力升息，在就業尚未完全衰退前，強制啟動 100% 現金避險。
 - **優先級 2 - 衰退逃命信號**：偵測殖利率「解除倒掛」且 Fed 啟動降息，確認實體經濟步入衰退，資金全面輪動至美債 ETF (00679B)。
 - **優先級 3 - 基本面攻擊**：利用美國新訂單 3MMA (三個月移動平均) 濾除單月雜訊，搭配台灣景氣燈號脫離藍燈 (>=17分)，啟動高勝率多頭重壓 (00881)。
 
-### 3. 🗣️ 首席轉譯官：智能推播層 (`notification_layer.py`)
+### 4. 🗣️ 首席轉譯官：智能推播層 (`notification_layer.py`)
 - 串接 Google Gemini API，嚴格要求 LLM 扮演「不帶情緒、極簡客觀」的轉譯官，將大腦輸出的 JSON 決策轉化為晨間早報。
 - 透過 LINE Messaging API 執行單向廣播推播。
-- **降級機制 (Fallback)**：預設主力模型為 `gemini-2.5-flash`，若遇伺服器 `503 Service Unavailable` 異常，系統將自動降級切換至 `gemini-1.5-flash`，確保每日晨報不中斷。
+- **降級機制 (Fallback)**：預設主力模型為 `gemini-3.5-flash`，若遇伺服器 `503 Service Unavailable` 異常，系統將自動降級切換至 `gemini-2.5-flash`，確保每日晨報不中斷。
 
-
+---
 ## 基礎建設與排程 (CI/CD & Cron)
 - **精準定時觸發**：由於 GitHub 內建 cron 存在尖峰壅塞延遲，本系統將排程指揮權轉交予 **cron-job.org**。透過精準的 Webhook (`workflow_dispatch`) 喚醒 GitHub Actions 執行自動化。
 - **時間偏移 (Jitter)**：刻意避開全球 API 請求壅塞的整點，設定於台灣時間 `08:37` 執行早盤分析。
@@ -42,10 +46,14 @@ LINE_CHANNEL_TOKEN=your_line_bot_token_here
 pip install -r requirements.txt
 ```
 ### 1. 獲取數據並產生 macro_data.json 等資料
-`python data_ingestion.py`
-
+```Bash
+python data_ingestion.py
+```
 ### 2. 核心大腦運算並產生 final_decision.json
-`python strategy_brain.py`
-
+```Bash
+python strategy_brain.py
+```
 ### 3. 轉譯文案並推播至 LINE
-`python notification_layer.py`
+```Bash
+python notification_layer.py
+```
