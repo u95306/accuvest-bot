@@ -39,21 +39,29 @@ GEMINI_API_KEY=your_gemini_api_key_here
 LINE_CHANNEL_TOKEN=your_line_bot_token_here
 ```
 ## 執行與測試 (Local Testing)
-在本地環境測試時，請嚴格按照以下順序執行，以確保 JSON 資料流傳遞正確：
+在本地環境手動測試時，請嚴格按照與 GitHub Actions (CI/CD) 完全相同的順序執行，以確保 JSON 資料流傳遞正確：
 ### 0. 安裝環境依賴 (Install Dependencies)
-請確保已啟動虛擬環境，並安裝所有必要套件（包含 pandas, fredapi, google-genai, python-dotenv, pyarrow 等）：
+請確保已啟動虛擬環境，並安裝所有必要套件：
 ```Bash
 pip install -r requirements.txt
 ```
 ### 1. 獲取數據並產生 macro_data.json 等資料
+抓取最新總經、燈號與市場數據，並清洗儲存為基礎 JSON 檔案。
 ```Bash
 python data_ingestion.py
 ```
 ### 2. 核心大腦運算並產生 final_decision.json
+讀取數據執行優先級決策樹，判定目前處於多頭攻擊或防守避險狀態。
 ```Bash
 python strategy_brain.py
 ```
-### 3. 轉譯文案並推播至 LINE
+### 3. ETF 嚴選層 (規模/流動性/動能決策)
+根據大腦決策，掃描大盤並選出季線之上、動能最強的前 3 大 ETF 標的。
+```Bash
+python etf_selector.py
+```
+### 4. 轉譯文案並推播至 LINE
+由 Gemini 擔任轉譯官，將前三步產出的最終數據與標的轉化為晨間早報，並推播至 LINE。
 ```Bash
 python notification_layer.py
 ```
