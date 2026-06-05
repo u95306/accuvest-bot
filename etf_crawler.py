@@ -38,7 +38,7 @@ def safe_fetch_json(url, max_retries=3):
     print(f"❌ 達到最大重試次數，無法獲取資料: {url}")
     return None
 
-def fetch_and_filter_etf(min_scale_ntd=50000000000, top_n=20):
+def fetch_and_filter_etf(min_scale_ntd=40000000000, top_n=20):
     """
     雙層過濾系統：
     第一層 (防禦)：依據 AUM (資產規模) 篩選出大於門檻的 ETF。
@@ -97,12 +97,16 @@ def fetch_and_filter_etf(min_scale_ntd=50000000000, top_n=20):
     df_merged['發行單位'] = df_merged[unit_col].astype(str).str.replace(',', '', regex=False)
     df_merged['發行單位'] = pd.to_numeric(df_merged['發行單位'], errors='coerce').fillna(0)
     
+    # ==========================================
+    # 💡 新增：在計算規模之前，先剔除包含字母 'A' 的主動型 ETF
+    # ==========================================
+    df_merged = df_merged[~df_merged['Code'].astype(str).str.contains('A', case=False, na=False)]
+
     # 計算 AUM 並過濾
     df_merged['AUM'] = df_merged['發行單位'] * df_merged['收盤價']
     df_safe_pool = df_merged[df_merged['AUM'] >= min_scale_ntd].copy()
     
-    print(f"🛡️ 第一層防護完畢：共有 {len(df_safe_pool)} 檔 ETF 規模超過 {min_scale_ntd/100000000} 億。")
-
+    print(f"🛡️ 第一層防護完畢：已剔除主動型 ETF，且共有 {len(df_safe_pool)} 檔 ETF 規模超過 {min_scale_ntd/100000000} 億。")
     # ---------------------------------------------------------
     # 步驟 3: 第二層排序 (月均成交金額流動性)
     # ---------------------------------------------------------
@@ -149,8 +153,8 @@ def fetch_and_filter_etf(min_scale_ntd=50000000000, top_n=20):
 
 # --- 測試執行區塊 ---
 if __name__ == "__main__":
-    # 設定門檻：規模大於 500 億，並取流動性前 20 名
-    best_etf_list = fetch_and_filter_etf(min_scale_ntd=50000000000, top_n=20)
+    # 設定門檻：規模大於 400 億，並取流動性前 20 名
+    best_etf_list = fetch_and_filter_etf(min_scale_ntd=40000000000, top_n=20)
     
     if best_etf_list is not None:
         print("\n🏆 AccuVest 雙層嚴選 ETF 名單 (規模達標 + 流動性 Top 20)：")
