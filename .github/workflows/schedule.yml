@@ -2,12 +2,15 @@ name: AccuVest Morning Briefing
 
 on:
   # 💡 移除原本的 schedule (cron)，完全依賴 workflow_dispatch
-  # 這樣 cron-job.org 才能透過 API 精準觸發，而且妳也能手動按鈕測試
   workflow_dispatch: 
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest # 使用最新的 Linux 虛擬機
+    
+    # 💡 關鍵新增：必須明確賦予 GitHub Actions 機器人「寫入 (Push)」的權限
+    permissions:
+      contents: write 
 
     steps:
       - name: 📥 檢索程式碼 (Checkout Code)
@@ -16,13 +19,12 @@ jobs:
       - name: 🐍 設定 Python 環境
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12' # 確保與妳本地測試版本一致
+          python-version: '3.12'
           cache: 'pip'
 
       - name: 📦 安裝依賴套件 (Install Requirements)
         run: |
           python -m pip install --upgrade pip
-          # 💡 改用 requirements.txt 一次裝好，更符合工程規範
           pip install -r requirements.txt
           pip list
 
@@ -46,7 +48,6 @@ jobs:
       - name: 🚀 啟動系統並產出打卡單
         if: steps.cache.outputs.cache-hit != 'true'
         env:
-          # 將所有存放在 GitHub Secrets 的金鑰一次注入
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
@@ -63,9 +64,31 @@ jobs:
           echo "📢 開始執行轉譯與推播層..."
           python notification_layer.py
           
-          # 若以上四行都順利跑完，代表今天任務圓滿達成，建立成功標記
           touch success.flag
           echo "✅ 系統執行完畢，已建立成功打卡單 (success.flag)"
+
+      # ==========================================
+      # 💡 新增：將動能分數與決策名單推播回 GitHub 保存 (長期記憶)
+      # ==========================================
+      - name: 💾 儲存長期記憶 (Commit & Push JSON)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          # 設定機器人的 Git 身份
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 💡 使用 -f (force) 強制加入，避免被先前的 .gitignore 規則擋住
+          git add -f top_etfs.json historical_scores.json
+          
+          # 檢查是否有檔案變動，如果有才執行 Commit 與 Push
+          if ! git diff --staged --quiet; then
+            # 💡 加上 [skip ci] 標籤，防止這次 push 又觸發其他的 Actions 無限循環
+            git commit -m "Auto-update: 儲存今日 ETF 決策名單與動能平滑分數 [skip ci]"
+            git push
+            echo "✅ 成功將最新狀態推播回 GitHub 倉庫！"
+          else
+            echo "⏭️ 檔案內容無變動，無需推播。"
+          fi
 
       # ==========================================
       # 💡 如果找到打卡單，就安靜地跳過
