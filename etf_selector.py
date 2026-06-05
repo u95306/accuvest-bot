@@ -140,6 +140,7 @@ if __name__ == "__main__":
             df_final.head(5).to_json('top_etfs.json', orient='records', force_ascii=False)
             print("\n📁 已經將平滑後的強勢標的存入 top_etfs.json")
             
+            # --- 測試執行區塊 ---
             print(f"\n🎯 最終決策清單 (綜合動能最強 Top 5)：")
             display_cols = ['Code', 'ETF名稱', '近120日漲幅(%)', '近60日漲幅(%)', '近20日漲幅(%)', '綜合動能分數']
             existing_cols = [c for c in display_cols if c in df_final.columns]
