@@ -1,6 +1,10 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import os
+import json
+from datetime import datetime
+from zoneinfo import ZoneInfo 
 from etf_crawler import fetch_and_filter_etf
 
 def rank_by_blended_momentum(df_top_n):
@@ -80,6 +84,35 @@ def rank_by_blended_momentum(df_top_n):
     print("✅ 大腦運算完畢！三維動能排序完成。")
     return df_final
 
+def apply_score_smoothing(df_today, history_file='historical_scores.json'):
+    """
+    引入歷史平滑機制 (今日 40% + 昨日 60%)，降低短期雜訊。
+    """
+    print("🌊 啟動分數平滑機制...")
+    yesterday_scores = {}
+    
+    if os.path.exists(history_file):
+        with open(history_file, 'r', encoding='utf-8') as f:
+            yesterday_scores = json.load(f)
+            
+    final_scores = []
+    for index, row in df_today.iterrows():
+        code = row['Code']
+        today_score = row['綜合動能分數']
+        
+        yesterday_score = yesterday_scores.get(code, today_score)
+        smoothed_score = (today_score * 0.4) + (yesterday_score * 0.6)
+        final_scores.append(round(smoothed_score, 2))
+        
+    df_today['綜合動能分數'] = final_scores
+    df_final = df_today.sort_values(by='綜合動能分數', ascending=False).reset_index(drop=True)
+    
+    # 存下最新的平滑分數供下次使用
+    current_scores_dict = dict(zip(df_final['Code'], df_final['綜合動能分數']))
+    with open(history_file, 'w', encoding='utf-8') as f:
+        json.dump(current_scores_dict, f, ensure_ascii=False, indent=4)
+        
+    return df_final
 
 # ==========================================
 # 系統主程序
@@ -87,19 +120,42 @@ def rank_by_blended_momentum(df_top_n):
 if __name__ == "__main__":
     print("🚀 AccuVest 系統啟動：開始執行選股管線...\n")
     
-    safe_etf_list = fetch_and_filter_etf(min_scale_ntd=50000000000, top_n=20)
+    taipei_tz = ZoneInfo("Asia/Taipei")
+    now_in_taipei = datetime.now(taipei_tz)
+
+    # 如果是星期一 (weekday() == 0) 才執行繁重的重新運算
+    if now_in_taipei.weekday() == 0:
+        print("📅 今日為週一，啟動核心動能計算與平滑機制...\n")
+        safe_etf_list = fetch_and_filter_etf(min_scale_ntd=40000000000, top_n=30)
     
-    if safe_etf_list is not None and not safe_etf_list.empty:
-        final_attack_list = rank_by_blended_momentum(safe_etf_list)
-        
-        # 🌟 將最強的前 5 名存入 JSON (供 LINE 推播讀取)
-        final_attack_list.head(5).to_json('top_etfs.json', orient='records', force_ascii=False)
-        print("\n📁 已經將最強標的存入 top_etfs.json")
-        
-        print(f"\n🎯 最終決策清單 (綜合動能最強 Top 5)：")
-        display_cols = ['Code', 'ETF名稱', '近120日漲幅(%)', '近60日漲幅(%)', '近20日漲幅(%)', '綜合動能分數']
-        # 🌟 確保存在欄位才印出，防止終端機當機
-        existing_cols = [c for c in display_cols if c in final_attack_list.columns]
-        print(final_attack_list[existing_cols].head(5).to_string())
+        if safe_etf_list is not None and not safe_etf_list.empty:
+            
+            # 1. 取得今日最新分數
+            df_today = rank_by_blended_momentum(safe_etf_list)
+            
+            # 2. 套用平滑公式 (封裝後的乾淨呼叫)
+            df_final = apply_score_smoothing(df_today)
+            
+            # 3. 輸出結果與儲存
+            df_final.head(5).to_json('top_etfs.json', orient='records', force_ascii=False)
+            print("\n📁 已經將平滑後的強勢標的存入 top_etfs.json")
+            
+            print(f"\n🎯 最終決策清單 (綜合動能最強 Top 5)：")
+            display_cols = ['Code', 'ETF名稱', '近120日漲幅(%)', '近60日漲幅(%)', '近20日漲幅(%)', '綜合動能分數']
+            existing_cols = [c for c in display_cols if c in df_final.columns]
+            
+            print(f"\n📊 目前排序依據：【近120日漲幅(%)】")
+            # 💡 建立一個專供顯示用的 DataFrame，並依照 120 日漲幅降冪 (由大到小) 排序
+            df_display = df_final.sort_values(by='近120日漲幅(%)', ascending=False)
+            print(df_display[existing_cols].head(20).to_string())
+            
+        else:
+            print("❌ 系統中斷：無法從資料獲取層取得有效名單。")
+            
     else:
-        print("❌ 系統中斷：無法從資料獲取層取得有效名單。")
+        # 非星期一，只需確認歷史檔案存在即可，不用重跑
+        print(f"📅 今日為星期 {now_in_taipei.weekday() + 1}，非更新日。")
+        if os.path.exists('top_etfs.json'):
+            print(f"📦 偵測到歷史紀錄，直接沿用上週一的 ETF 排行榜資料。")
+        else:
+             print("⚠️ 警告：找不到上週的 top_etfs.json，可能會影響後續推播層運作。")
