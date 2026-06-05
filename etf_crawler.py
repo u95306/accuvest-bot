@@ -1,6 +1,42 @@
+import time
 import requests
 import pandas as pd
+from requests.exceptions import RequestException, Timeout, ConnectionError
 import numpy as np
+
+def safe_fetch_json(url, max_retries=3):
+    """
+    安全獲取 JSON 資料的通用函式，包含超時、異常捕獲與重試機制
+    """
+    headers = {'Connection': 'close'}
+    
+    for attempt in range(1, max_retries + 1):
+        try:
+            # 這裡使用 (3, 10) 代表 3 秒連線超時，10 秒讀取超時
+            response = requests.get(url, headers=headers, verify=False, timeout=10)
+            
+            # 如果 HTTP 狀態碼不是 200，會在這裡主動觸發 HTTPError 異常
+            response.raise_for_status() 
+            
+            # 成功獲取並解析 JSON
+            return response.json()
+            
+        except Timeout as e:
+            print(f"⚠️ 請求超時 (嘗試 {attempt}/{max_retries}): {url} -> {e}")
+        except ConnectionError as e:
+            print(f"⚠️ 連線錯誤 (嘗試 {attempt}/{max_retries}): {url} -> {e}")
+        except RequestException as e:
+            print(f"⚠️ 其他請求異常 (嘗試 {attempt}/{max_retries}): {url} -> {e}")
+        except ValueError:
+            print(f"❌ 解析失敗：該 URL 回傳的不是合法的 JSON 格式: {url}")
+            return None
+            
+        # 如果不是最後一次嘗試，就等待 5 秒再重試，避免頻率過高被封鎖
+        if attempt < max_retries:
+            time.sleep(5)
+            
+    print(f"❌ 達到最大重試次數，無法獲取資料: {url}")
+    return None
 
 def fetch_and_filter_etf(min_scale_ntd=50000000000, top_n=20):
     """
@@ -9,21 +45,26 @@ def fetch_and_filter_etf(min_scale_ntd=50000000000, top_n=20):
     第二層 (攻擊)：在第一層的安全名單中，依據「月均成交金額」排序，取出前 N 名。
     """
     print("啟動資料獲取層：正在向證交所請求 ETF 規模與流動性數據...\n")
-    
     # ---------------------------------------------------------
     # 步驟 1: 獲取所需的三份資料表
     # ---------------------------------------------------------
     url_avg_price = "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_AVG_ALL"
     url_units = "https://openapi.twse.com.tw/v1/opendata/t187ap47_L"
     url_monthly_volume = "https://openapi.twse.com.tw/v1/exchangeReport/FMSRFK_ALL"
+
+    print("🔄 開始依序獲取台灣證交所 API 資料...")
     
-    try:
-        res_price = requests.get(url_avg_price, timeout=10).json()
-        res_units = requests.get(url_units, timeout=10).json()
-        res_volume = requests.get(url_monthly_volume, timeout=10).json()
-    except Exception as e:
-        print(f"❌ API 請求失敗，請檢查網路狀態: {e}")
+    # 呼叫 safe_fetch_json 安全獲取三份資料
+    res_price = safe_fetch_json(url_avg_price)
+    res_units = safe_fetch_json(url_units)
+    res_volume = safe_fetch_json(url_monthly_volume)
+
+    # 檢查是否所有資料都成功拿到 (只要有一個是 None 就終止)
+    if not all([res_price, res_units, res_volume]):
+        print("❌ 核心資料下載不完整，終止後續處理。")
         return None
+
+    print("✅ 所有資料表獲取成功，開始進行資料處理...")
 
     # 轉為 DataFrame
     df_price = pd.DataFrame(res_price)
