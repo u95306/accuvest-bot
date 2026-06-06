@@ -100,12 +100,8 @@ class AccuVestBrain:
                         {
                             "status": "RECESSION_STEEPENING_CRASH",
                             "action": "【中期防禦型減碼】",
-                            # 堅定採用您上一版的黃金比例：保留 30% 現金作為半年後台股跌深的抄底子彈
-                            "asset_allocation": {
-                                "股票型基金": 10,
-                                "美國債券": 60,
-                                "現金": 30,
-                            },
+                            # 股票移至美債擴大收益，並且保留 30% 現金作為半年後台股跌深的抄底子彈
+                            "asset_allocation": {"股票型基金": 0, "美國債券": 70, "現金": 30},
                             "reason": f"確認觸發衰退斷路器。T10Y2Y 歷史實質倒掛達 {inversion_days} 天。當前利差強勢突破 0.5% 門檻（現為 {current_spread:.2f}%），債市確認進入衰退陡峭化階段。強制執行中期防禦配置，鎖定美債利潤並保留現金子彈。",
                         }
                     )
@@ -138,7 +134,8 @@ class AccuVestBrain:
             decision.update({
                 "status": "OVERHEATED_DEFENSE",
                 "action": "【過熱防禦：分批獲利了結】",
-                "asset_allocation": {"股票型基金": 40, "美國債券": 30, "現金": 30},
+                #獲利了結一半股票。增配 20% 美債與 30% 現金，為景氣崩群做準備。
+                "asset_allocation": {"股票型基金": 50, "美國債券": 20, "現金": 30},
                 "reason": f"台灣景氣燈號達 {tw_score} 分 ({tw_color})，市場呈現過熱狂熱，強制啟動過熱防護，調節股票部位落袋為安。"
             })
             return decision
@@ -164,7 +161,8 @@ class AccuVestBrain:
             decision.update({
                 "status": "MARKET_CORRECTION",
                 "action": "【常規修正：出清觀望】",
-                "asset_allocation": {"股票型基金": 0, "美國債券": 50, "現金": 50},
+                #常規修正不該清倉。保留 40% 股票參與市場，30% 美債防禦，30% 現金隨時加碼。
+                "asset_allocation": {"股票型基金": 40, "美國債券": 30, "現金": 30},
                 "reason": f"美國訂單 3MMA 動能疲軟轉向，且台灣燈號({tw_color})尚未過熱，基本面轉入常規修正期，建議轉入避險資產等待落底。"
             })
             return decision
