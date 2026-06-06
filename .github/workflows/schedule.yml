@@ -67,8 +67,8 @@ jobs:
           touch success.flag
           echo "✅ 系統執行完畢，已建立成功打卡單 (success.flag)"
 
-      # ==========================================
-      # 💡 新增：將動能分數與決策名單推播回 GitHub 保存 (長期記憶)
+# ==========================================
+      # 💡 儲存長期記憶：現在只同步最純粹的 top_etfs.json
       # ==========================================
       - name: 💾 儲存長期記憶 (Commit & Push JSON)
         if: steps.cache.outputs.cache-hit != 'true'
@@ -77,15 +77,15 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 💡 使用 -f (force) 強制加入，避免被先前的 .gitignore 規則擋住
-          git add -f top_etfs.json historical_scores.json
+          # 💡 修改：僅強制追蹤即時強勢名單 top_etfs.json
+          git add -f top_etfs.json
           
           # 檢查是否有檔案變動，如果有才執行 Commit 與 Push
           if ! git diff --staged --quiet; then
-            # 💡 加上 [skip ci] 標籤，防止這次 push 又觸發其他的 Actions 無限循環
-            git commit -m "Auto-update: 儲存今日 ETF 決策名單與動能平滑分數 [skip ci]"
+            # 💡 移除 commit 訊息中的平滑分數字眼，保持狀態一致性
+            git commit -m "Auto-update: 儲存今日 ETF 最新決策名單 [skip ci]"
             git push
-            echo "✅ 成功將最新狀態推播回 GitHub 倉庫！"
+            echo "✅ 成功將最新強勢名單推播回 GitHub 倉庫！"
           else
             echo "⏭️ 檔案內容無變動，無需推播。"
           fi
