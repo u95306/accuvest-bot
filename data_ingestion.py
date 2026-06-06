@@ -157,15 +157,16 @@ def fetch_and_save_macro_data():
 # ==========================================
 
 def logic_yield_curve():
-    # T10Y2Y 是 FRED 官方計算好的 10年減2年 利差數據
+    # 💡 決定：中期（半年~一年）避險追蹤，T10Y2Y 的轉折訊號比 T10Y3M 更具備領先性與操作空間
     data = fred.get_series('T10Y2Y')
     time.sleep(2)
     if data.empty:
         return False
 
     df = pd.DataFrame(data, columns=['spread'])
-    # 利差數據天天更新，我們取最近 120 個交易日 (約半年) 來觀察趨勢
-    df = df.dropna().tail(120)
+    # 🚨 重要修改：不能唯獨取 120 天。必須取至少 252 個交易日（約 1 年）
+    # 這樣才能在「現在解除倒掛」時，依然能在陣列中找到「過去幾個月前倒掛」的痕跡
+    df = df.dropna().tail(252)
 
     cleaned_data = {
         "indicator": "Yield_Curve_10Y2Y",
@@ -189,40 +190,36 @@ def fetch_and_save_yield_curve():
 # ==========================================
 
 def logic_indicators():
+    # 1. 抓取通膨 CPI
     cpi_raw = fred.get_series('CPIAUCSL')
     cpi_df = pd.DataFrame(cpi_raw, columns=['cpi'])
     cpi_df['cpi_yoy'] = cpi_df['cpi'].pct_change(12, fill_method=None) * 100
     time.sleep(2)
-    # 2. 抓取基準利率 (FEDFUNDS)
-    fed_rate = fred.get_series('FEDFUNDS')
+
+    # 2. 抓取失業率 (UNRATE) 取代充滿雜訊的 NFP
+    unrate_raw = fred.get_series('UNRATE')
     time.sleep(2)
-    # 💡 3. 新增：抓取非農就業人口 (PAYEMS)，並計算「每月新增人數」
-    nfp_raw = fred.get_series('PAYEMS')
-    nfp_diff = nfp_raw.diff() # 計算與上個月的差值 (新增了多少人)
-    time.sleep(2)
-    # 4. 整合最近半年的數據
+    # 3. 整合最近一年 (12個月) 的數據，因為 Sahm Rule 需要過去 12 個月的最低點
     combined = pd.DataFrame({
         'cpi_yoy': cpi_df['cpi_yoy'],
-        'fed_rate': fed_rate,
-        'nfp_additions': nfp_diff # 💡 併入 NFP 數據
-    }).dropna().tail(6)
+        'unrate': unrate_raw # 💡 併入失業率數據
+    }).dropna().tail(12)
 
     cleaned_data = {
         "indicator": "Safety_Monitor",
         "dates": combined.index.strftime('%Y-%m-%d').tolist(),
         "cpi_yoy": combined['cpi_yoy'].tolist(),
-        "fed_rate": combined['fed_rate'].tolist(),
-        "nfp_additions": combined['nfp_additions'].tolist() # 💡 輸出給大腦
+        "unrate": combined['unrate'].tolist() # 💡 輸出失業率供大腦計算 Sahm Rule
     }
 
     with open('safety_data.json', 'w') as f:
         json.dump(cleaned_data, f, indent=4)
 
-    print("✅ [資料層] 安全監控數據已儲存。")
+    print("✅ [資料層] 通膨與失業率監控數據已儲存至 safety_data.json。")
     return True
 
 def fetch_safety_indicators():
-    fetch_fred_with_retry(logic_indicators, "通膨與利率")
+    fetch_fred_with_retry(logic_indicators, "通膨與失業率")
 
 
 
