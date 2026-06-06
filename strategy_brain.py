@@ -100,22 +100,19 @@ class AccuVestBrain:
                         {
                             "status": "RECESSION_STEEPENING_CRASH",
                             "action": "【中期防禦型減碼】",
-                            # 堅定採用您上一版的黃金比例：保留 30% 現金作為半年後台股跌深的抄底子彈
-                            "asset_allocation": {
-                                "股票型基金": 10,
-                                "美國債券": 60,
-                                "現金": 30,
-                            },
+                            # 股票移至美債擴大收益，並且保留 30% 現金作為半年後台股跌深的抄底子彈
+                            "asset_allocation": {"股票型基金": 0, "美國債券": 70, "現金": 30},
                             "reason": f"確認觸發衰退斷路器。T10Y2Y 歷史實質倒掛達 {inversion_days} 天。當前利差強勢突破 0.5% 門檻（現為 {current_spread:.2f}%），債市確認進入衰退陡峭化階段。強制執行中期防禦配置，鎖定美債利潤並保留現金子彈。",
                         }
                     )
                     return decision  # 絕對否決權，乾淨俐落
 
-        # ==========================================
+        
         # 預先提取與計算台灣燈號與美國訂單數據
-        # ==========================================
-        tw_score = taiwan.get('score', 0) if taiwan else 0
-        tw_color = taiwan.get('color_name', '未知') if taiwan else '未知'
+        tw_scores = taiwan.get('scores', []) if taiwan else []
+        tw_colors = taiwan.get('color_names', []) if taiwan else []
+        tw_score = tw_scores[-1] if tw_scores else 0
+        tw_color = tw_colors[-1] if tw_colors else '未知'
         
         is_order_3mma_up = False
         if orders:
@@ -131,17 +128,19 @@ class AccuVestBrain:
                 is_order_3mma_up = order_values[-1] > 0
         
         # ==========================================
-        # 優先級 4：台灣景氣過熱防護 (紅燈數鈔票)
+        # 優先級 4：台灣景氣過熱防護 (連續三紅燈才收割)
         # ==========================================
-        # 分數達到 38 (紅燈區)，不管美國訂單多好，強制啟動獲利了結防禦
-        if tw_score >= 38:
+        # 判斷是否連續三個月紅燈 (分數 >= 38)
+        is_three_red_lights = len(tw_scores) >= 3 and all(s >= 38 for s in tw_scores[-3:])
+        if is_three_red_lights:
             decision.update({
                 "status": "OVERHEATED_DEFENSE",
                 "action": "【過熱防禦：分批獲利了結】",
-                "asset_allocation": {"股票型基金": 40, "美國債券": 30, "現金": 30},
-                "reason": f"台灣景氣燈號達 {tw_score} 分 ({tw_color})，市場呈現過熱狂熱，強制啟動過熱防護，調節股票部位落袋為安。"
+                "asset_allocation": {"股票型基金": 50, "美國債券": 20, "現金": 30},
+                "reason": f"台灣景氣燈號已「連續 3 個月」亮出紅燈 (最新 {tw_score} 分)，確認市場處於極度狂熱末端，強制啟動防護，分批調節股票落袋為安。"
             })
             return decision
+        
 
         # ==========================================
         # 優先級 5：基本面攻擊引擎 (藍燈買股票)
@@ -164,7 +163,8 @@ class AccuVestBrain:
             decision.update({
                 "status": "MARKET_CORRECTION",
                 "action": "【常規修正：出清觀望】",
-                "asset_allocation": {"股票型基金": 0, "美國債券": 50, "現金": 50},
+                #常規修正不該清倉。保留 40% 股票參與市場，30% 美債防禦，30% 現金隨時加碼。
+                "asset_allocation": {"股票型基金": 40, "美國債券": 30, "現金": 30},
                 "reason": f"美國訂單 3MMA 動能疲軟轉向，且台灣燈號({tw_color})尚未過熱，基本面轉入常規修正期，建議轉入避險資產等待落底。"
             })
             return decision

@@ -69,21 +69,21 @@ def fetch_and_save_taiwan_light(zip_url):
 
         # 排序並取得最新一筆
         df = df.sort_values(by='Date').reset_index(drop=True)
-        latest_data = df.iloc[-1]
+        recent_df = df.tail(6) # 取最近半年資料
 
         # 轉換為標準 Python 字典 (注意型別轉換，避免 JSON 報錯)
         cleaned_data = {
             "indicator": "Taiwan_Business_Indicator",
-            "date": str(latest_data['Date']),
-            "score": int(latest_data['景氣對策信號綜合分數']),
-            "color_name": str(latest_data['景氣對策信號'])
+            "dates": recent_df['Date'].astype(str).tolist(),
+            "scores": recent_df['景氣對策信號綜合分數'].astype(int).tolist(),
+            "color_names": recent_df['景氣對策信號'].astype(str).tolist()
         }
 
         # 存成獨立的 JSON 檔案
         with open('taiwan_light.json', 'w', encoding='utf-8') as f:
             json.dump(cleaned_data, f, ensure_ascii=False, indent=4)
 
-        print(f"✅ [資料層] 獲取成功！最新月份 {cleaned_data['date']} 已儲存至 taiwan_light.json")
+        print(f"✅ [資料層] 獲取成功！最新月份 {cleaned_data['dates']} 已儲存至 taiwan_light.json")
         return True
 
     except Exception as e:
