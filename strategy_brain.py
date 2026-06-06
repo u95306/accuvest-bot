@@ -107,11 +107,12 @@ class AccuVestBrain:
                     )
                     return decision  # 絕對否決權，乾淨俐落
 
-        # ==========================================
+        
         # 預先提取與計算台灣燈號與美國訂單數據
-        # ==========================================
-        tw_score = taiwan.get('score', 0) if taiwan else 0
-        tw_color = taiwan.get('color_name', '未知') if taiwan else '未知'
+        tw_scores = taiwan.get('scores', []) if taiwan else []
+        tw_colors = taiwan.get('color_names', []) if taiwan else []
+        tw_score = tw_scores[-1] if tw_scores else 0
+        tw_color = tw_colors[-1] if tw_colors else '未知'
         
         is_order_3mma_up = False
         if orders:
@@ -127,18 +128,19 @@ class AccuVestBrain:
                 is_order_3mma_up = order_values[-1] > 0
         
         # ==========================================
-        # 優先級 4：台灣景氣過熱防護 (紅燈數鈔票)
+        # 優先級 4：台灣景氣過熱防護 (連續三紅燈才收割)
         # ==========================================
-        # 分數達到 38 (紅燈區)，不管美國訂單多好，強制啟動獲利了結防禦
-        if tw_score >= 38:
+        # 判斷是否連續三個月紅燈 (分數 >= 38)
+        is_three_red_lights = len(tw_scores) >= 3 and all(s >= 38 for s in tw_scores[-3:])
+        if is_three_red_lights:
             decision.update({
                 "status": "OVERHEATED_DEFENSE",
                 "action": "【過熱防禦：分批獲利了結】",
-                #獲利了結一半股票。增配 20% 美債與 30% 現金，為景氣崩群做準備。
                 "asset_allocation": {"股票型基金": 50, "美國債券": 20, "現金": 30},
-                "reason": f"台灣景氣燈號達 {tw_score} 分 ({tw_color})，市場呈現過熱狂熱，強制啟動過熱防護，調節股票部位落袋為安。"
+                "reason": f"台灣景氣燈號已「連續 3 個月」亮出紅燈 (最新 {tw_score} 分)，確認市場處於極度狂熱末端，強制啟動防護，分批調節股票落袋為安。"
             })
             return decision
+        
 
         # ==========================================
         # 優先級 5：基本面攻擊引擎 (藍燈買股票)
