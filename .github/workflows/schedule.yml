@@ -1,12 +1,16 @@
 name: AccuVest Morning Briefing
 
 on:
+  # 💡 移除原本的 schedule (cron)，完全依賴 workflow_dispatch
   workflow_dispatch: 
-    # 加入這個設定，讓妳可以在 GitHub 網頁上手動點擊按鈕進行測試
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest # 使用最新的 Linux 虛擬機
+    
+    # 💡 關鍵新增：必須明確賦予 GitHub Actions 機器人「寫入 (Push)」的權限
+    permissions:
+      contents: write 
 
     steps:
       - name: 📥 檢索程式碼 (Checkout Code)
@@ -15,30 +19,80 @@ jobs:
       - name: 🐍 設定 Python 環境
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-          cache: 'pip' # 快取套件，讓未來的執行速度更快
+          python-version: '3.12'
+          cache: 'pip'
 
       - name: 📦 安裝依賴套件 (Install Requirements)
         run: |
-          
           python -m pip install --upgrade pip
-          pip install requests pandas fredapi
-          pip install --upgrade google-genai
-          
+          pip install -r requirements.txt
           pip list
 
-      - name: 📡 步驟一：資料獲取層 (Data Ingestion)
+      # ==========================================
+      # 💡 導入企業級容錯：交接聯絡簿機制 (Cache)
+      # ==========================================
+      - name: 📅 取得今日日期 (作為聯絡簿密碼)
+        id: date
+        run: echo "TODAY=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+
+      - name: 🔍 檢查今日成功打卡單
+        id: cache
+        uses: actions/cache@v3
+        with:
+          path: success.flag
+          key: accuvest-success-${{ env.TODAY }}
+
+      # ==========================================
+      # 💡 只有在「沒有打卡單」時才執行核心運算
+      # ==========================================
+      - name: 🚀 啟動系統並產出打卡單
+        if: steps.cache.outputs.cache-hit != 'true'
         env:
-          # 將存放在 GitHub Secrets 的金鑰注入虛擬環境
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-        run: python data_ingestion.py
-
-      - name: 🧠 步驟二：核心大腦層 (Strategy Brain)
-        # 大腦層只讀取本地 JSON，不需要外部金鑰
-        run: python strategy_brain.py
-
-      - name: 📢 步驟三：轉譯與推播層 (Notification Layer)
-        env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
-        run: python notification_layer.py
+        run: |
+          echo "📡 開始執行資料獲取層..."
+          python data_ingestion.py
+          
+          echo "🧠 開始執行核心大腦層 (總經決策)..."
+          python strategy_brain.py
+          
+          echo "🎯 開始執行 ETF 嚴選層 (規模/流動性/動能決策)..."
+          python etf_selector.py
+          
+          echo "📢 開始執行轉譯與推播層..."
+          python notification_layer.py
+          
+          touch success.flag
+          echo "✅ 系統執行完畢，已建立成功打卡單 (success.flag)"
+
+# ==========================================
+      # 💡 儲存長期記憶：現在只同步最純粹的 top_etfs.json
+      # ==========================================
+      - name: 💾 儲存長期記憶 (Commit & Push JSON)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          # 設定機器人的 Git 身份
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 💡 修改：僅強制追蹤即時強勢名單 top_etfs.json
+          git add -f top_etfs.json
+          
+          # 檢查是否有檔案變動，如果有才執行 Commit 與 Push
+          if ! git diff --staged --quiet; then
+            # 💡 移除 commit 訊息中的平滑分數字眼，保持狀態一致性
+            git commit -m "Auto-update: 儲存今日 ETF 最新決策名單 [skip ci]"
+            git push
+            echo "✅ 成功將最新強勢名單推播回 GitHub 倉庫！"
+          else
+            echo "⏭️ 檔案內容無變動，無需推播。"
+          fi
+
+      # ==========================================
+      # 💡 如果找到打卡單，就安靜地跳過
+      # ==========================================
+      - name: ⏭️ 略過執行通知
+        if: steps.cache.outputs.cache-hit == 'true'
+        run: echo "⏭️ 今天早上已經成功推播過了，跳過中午的降級備用排程。"
