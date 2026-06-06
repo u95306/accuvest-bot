@@ -64,7 +64,12 @@ def get_gemini_briefing():
             code = etf.get('Code', '未知')
             name = etf.get('ETF名稱', '未知')
             score = etf.get('綜合動能分數', 0.0)
-            etf_lines.append(f"  {i}. {code} {name} (動能: {score})")
+
+            # 💡 提取大腦算出的黃金坑標記
+            signal = etf.get('訊號標記', '')
+            signal_display = f" {signal}" if signal else ""
+
+            etf_lines.append(f"  {i}. {code} {name} (動能: {score}){signal_display}")
         
         # 將陣列組合成換行的字串
         etf_recommendation = "\n" + "\n".join(etf_lines)
@@ -104,7 +109,8 @@ def get_gemini_briefing():
     1. 第一行直接印出核心決策。
     2. 第二段用當前盤面數據簡單解釋這個決策，並列出資產配置。
     3. 🌟 如果決策是「建議進場」或「強制觀望」，請在最後一段【完整條列出這 5 檔】強勢嚴選標的與分數。
-    4. 語氣要堅定，排版要乾淨俐落，方便在手機上閱讀。
+    4. 🚨 關鍵任務：如果標的後方帶有「🚨 超跌黃金坑」標記，請在文案中用一句話冷靜點出「部分標的出現負乖離，具備潛在右側佈局價值」。
+    5. 語氣要堅定，排版要乾淨俐落，方便在手機上閱讀。
     """
 
     # --- 步驟 D：組合寫給 Gemini 的 Prompt ---
