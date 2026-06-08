@@ -50,11 +50,13 @@ def get_gemini_briefing():
 
     # --- 步驟 B：動態提取最新盤面數據 (加入防呆機制) ---
     try:
-        orders_yoy = f"{orders['values'][-1]:.2f}" if orders else "未知"
-        yield_spread = f"{yield_data['values'][-1]:.2f}" if yield_data else "未知"
-        cpi = f"{safety['cpi_yoy'][-1]:.1f}" if safety else "未知"
-        tw_light = taiwan['color_name'] if taiwan else "未知"
-    except (KeyError, IndexError):
+        orders_yoy = f"{orders.get('values', [0])[-1]:.2f}" if orders else "未知"
+        yield_spread = f"{yield_data.get('values', [0])[-1]:.2f}" if yield_data else "未知"
+        cpi = f"{safety.get('cpi_yoy', [0])[-1]:.1f}" if safety else "未知"
+        # 💡 關鍵修正：對應最新版連續燈號的 'color_names' 陣列
+        tw_light = taiwan.get('color_names', ['未知'])[-1] if taiwan else "未知"
+    except Exception as e:
+        print(f"⚠️ 提取數據發生錯誤: {e}")
         orders_yoy, yield_spread, cpi, tw_light = "讀取異常", "讀取異常", "讀取異常", "讀取異常"
 
     etf_recommendation = "無（維持現金或觀望）"
@@ -90,7 +92,7 @@ def get_gemini_briefing():
     - 今日強勢嚴選 Top 5: {etf_recommendation}
     """
 
-    # --- 步驟 D：組合寫給 Gemini 的 Prompt ---
+    # --- 組合寫給 Gemini 的 Prompt ---
     prompt = f"""
     你現在是 AccuVest 極簡投資平台的「首席文案轉譯官」。
     你的任務是撰寫今天的晨間推播。
@@ -112,6 +114,7 @@ def get_gemini_briefing():
     4. 🚨 關鍵任務：如果標的後方帶有「🚨 超跌黃金坑」標記，請在文案中用一句話冷靜點出「部分標的出現負乖離，具備潛在右側佈局價值」。
     5. 語氣要堅定，排版要乾淨俐落，方便在手機上閱讀。
     """
+    
 
     # --- 步驟 D：組合寫給 Gemini 的 Prompt ---
     # (前面組裝 prompt 的程式碼維持不變...)
@@ -134,7 +137,7 @@ def get_gemini_briefing():
         
         # 判斷是否為 503 錯誤 (或者其他伺服器端錯誤)
         if "503" in error_message or "Service Unavailable" in error_message:
-            print("🔄 偵測到 503 錯誤，啟動降級機制，切換至 gemini-3.5-flash...")
+            print("🔄 偵測到 503 錯誤，啟動降級機制，切換至 gemini-2.5-flash...")
             try:
                 # 備用方案：使用 gemini-2.5-flash (注意：Google 目前沒有 2.5-flash，備用通常選前一代或 lite)
                 fallback_response = client.models.generate_content(
@@ -154,7 +157,7 @@ def get_gemini_briefing():
 
 
 def broadcast_to_line(message_text):
-    """嘴巴：呼叫 LINE 廣播 API 發送訊息"""
+    #嘴巴：呼叫 LINE 廣播 API 發送訊息
     if not message_text:
         print("⚠️ 沒有文案可發送。")
         return
@@ -199,3 +202,4 @@ if __name__ == "__main__":
 
         # 步驟 2：請嘴巴發送出去
         broadcast_to_line(briefing_content)
+
