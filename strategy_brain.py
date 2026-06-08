@@ -116,16 +116,11 @@ class AccuVestBrain:
         
         is_order_3mma_up = False
         if orders:
-            order_values = orders.get('values', [])
-            if len(order_values) >= 4:
-                # 計算最近三個月的平均 (Current 3MMA)
-                current_3mma = sum(order_values[-3:]) / 3
-                # 計算上個月看回去的三個月平均 (Previous 3MMA)
-                prev_3mma = sum(order_values[-4:-1]) / 3
-                # 3MMA 進場點：轉為正成長，或是擺脫谷底連續向上
-                is_order_3mma_up = (current_3mma > 0) or (current_3mma > prev_3mma)
-            elif order_values:
-                is_order_3mma_up = order_values[-1] > 0
+            order_3mma_values = orders.get('values', [])
+            # 💡 既然 values 已經是 3MMA 的數值，要判斷趨勢是否向上：
+            # 只要最新一個月（[-1]）大於上個月（[-2]）即可！
+            if len(order_3mma_values) >= 2:
+                is_order_3mma_up = order_3mma_values[-1] > order_3mma_values[-2]
         
         # ==========================================
         # 優先級 4：台灣景氣過熱防護 (連續三紅燈才收割)
@@ -145,14 +140,27 @@ class AccuVestBrain:
         # ==========================================
         # 優先級 5：基本面攻擊引擎 (藍燈買股票)
         # ==========================================
-        # 只要美國訂單向上，不管台灣燈號是不是藍燈，果斷判定為牛市
+        # 只要美國訂單向上，不管台灣燈號是不是藍燈，果斷判定為牛市    
         if is_order_3mma_up:
-            decision.update({
-                "status": "BULL_MARKET",
-                "action": "【全軍突擊/抱緊】",
-                "asset_allocation": {"股票型基金": 100, "美國債券": 0, "現金": 0},
-                "reason": f"美國製造業訂單 3MMA 趨勢強勢向上，無需等待台灣燈號({tw_color})轉好，確認為多頭擴張期，100% 佈局強勢 ETF。"
-            })
+            # 💡 關鍵判斷：如果前一個月還在過熱防禦狀態（例如 tw_scores[-2] 是紅燈 >=38），代表剛脫離紅燈
+            is_just_exited_red = len(tw_scores) >= 2 and tw_scores[-2] >= 38
+            
+            if is_just_exited_red:
+                decision.update({
+                    "status": "BULL_MARKET_RECOVERY",
+                    "action": "【牛市初試：部分資金回補】",
+                    # 從原先防禦的股票 50% 提高到 75%（即買回 25% 的股票）
+                    "asset_allocation": {"股票型基金": 75, "美國債券": 10, "現金": 15},
+                    "reason": "台灣燈號已脫離連續紅燈(過熱解除)，且美國製造業訂單 3MMA 趨勢強勢向上。策略啟動「第一階段分批買回 25%」，保留部分現金防禦高檔震盪。"
+                })
+            else:
+                # 如果已經脫離紅燈很久了，美國訂單依舊強勁，直接全軍突擊
+                decision.update({
+                    "status": "BULL_MARKET",
+                    "action": "【全軍突擊/抱緊】",
+                    "asset_allocation": {"股票型基金": 100, "美國債券": 0, "現金": 0},
+                    "reason": "美國製造業訂單 3MMA 趨勢強勢向上，且台灣無過熱疑慮，確認為多頭擴張期，100% 佈局強勢 ETF。"
+                })
             return decision
         
         # ==========================================

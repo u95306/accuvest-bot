@@ -122,29 +122,36 @@ fred = Fred(api_key=FRED_API_KEY)
 # ==========================================
            
 def logic_macro_data():
+    # 1. 抓取完整歷史數據
     data = fred.get_series('AMTMNO')
     time.sleep(2)
     if data.empty:
         return False
 
     df = pd.DataFrame(data, columns=['new_orders'])
+    # 2. 先計算原始訂單的 YoY（年增率）
     df['yoy_growth'] = df['new_orders'].pct_change(periods=12, fill_method=None) * 100
 
-    # 大腦其實只需要最近 6 個月的數據來判斷趨勢，我們過濾掉多餘雜訊
-    df = df.dropna().tail(6)
+    # 3. 💡 在這裡直接計算 YoY 的 3 個月移動平均 (3MMA)
+    # 使用完整歷史數據計算，絕對不會有斷層問題
+    df['yoy_3mma'] = df['yoy_growth'].rolling(window=3).mean()
 
-    # 將 DataFrame 轉換為乾淨的 Python 字典
+    # 4. 剔除空值，並只留下最近 6 個月，精簡 JSON 體積
+    df_clean = df.dropna()
+    df_tail = df_clean.tail(6)
+
+    # 5. 封裝成乾淨的媒介
     cleaned_data = {
-        "indicator": "AMTMNO_YoY",
-        "dates": df.index.strftime('%Y-%m-%d').tolist(),
-        "values": df['yoy_growth'].tolist()
-    }
+        "indicator": "AMTMNO_YoY_3MMA",
+        "dates": df_tail.index.strftime('%Y-%m-%d').tolist(),
+        "values": df_tail['yoy_3mma'].round(2).tolist() # 這裡存的直接就是 3MMA 的值了！
+    }    
 
     # 將乾淨的數據存成 JSON 檔案 (這就是解耦的關鍵媒介)
     with open('macro_data.json', 'w') as f:
         json.dump(cleaned_data, f, indent=4)
 
-    print("✅ [資料層] 數據清洗完成，已儲存至 macro_data.json")
+    print("✅ [資料層] 3MMA 趨勢數據清洗完成，已儲存至 macro_data.json")
     return True
 
 def fetch_and_save_macro_data():
