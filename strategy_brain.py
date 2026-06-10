@@ -40,19 +40,23 @@ class AccuVestBrain:
 
         # 預先提取利率與就業資料 (多個優先級會用到)
         cpi_list = safety.get('cpi_yoy', []) if safety else []
+        core_cpi_list = safety.get('core_cpi_yoy', []) if safety else [] # 💡 提取核心通膨
         unrate_list = safety.get("unrate", []) if safety else []  # 用於薩姆規則
         # ==========================================
         # 優先級 1：通膨斷路器 2.0 (Exception) - 極簡 CPI 防呆
         # ==========================================
 
-        if len(cpi_list) > 0:
+        if len(cpi_list) > 0 and len(core_cpi_list) > 0:
             current_cpi = cpi_list[-1]
-            if current_cpi >= 4.0:
+            current_core_cpi = core_cpi_list[-1]
+            
+            # 💡 雙重硬門檻：名目大於 4.0 且核心大於 3.5 才判定為惡性通膨
+            if current_cpi >= 4.0 and current_core_cpi >= 3.5:
                 decision.update({
                     "status": "STAGFLATION_CRASH",
                     "action": "【全面清倉】",
                     "asset_allocation": {"股票型基金": 0, "美國債券": 0, "現金": 100},
-                    "reason": f"偵測到惡性通膨 (CPI: {current_cpi:.1f}%)，強制啟動股債雙殺斷路器，全數轉為現金避險。"
+                    "reason": f"偵測到惡性通膨 (名目 {current_cpi:.1f}%, 核心 {current_core_cpi:.1f}%)，實質通膨深入經濟核心，強制啟動股債雙殺斷路器，全數轉為現金避險。"
                 })
                 return decision
         

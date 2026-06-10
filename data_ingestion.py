@@ -203,12 +203,19 @@ def logic_indicators():
     cpi_df['cpi_yoy'] = cpi_df['cpi'].pct_change(12, fill_method=None) * 100
     time.sleep(2)
 
+    # 💡 新增：抓取核心 CPI (Core CPI)
+    core_cpi_raw = fred.get_series('CPILFESL')
+    core_cpi_df = pd.DataFrame(core_cpi_raw, columns=['core_cpi'])
+    core_cpi_df['core_cpi_yoy'] = core_cpi_df['core_cpi'].pct_change(12, fill_method=None) * 100
+    time.sleep(2)
+
     # 2. 抓取失業率 (UNRATE) 取代充滿雜訊的 NFP
     unrate_raw = fred.get_series('UNRATE')
     time.sleep(2)
     # 3. 整合最近一年 (12個月) 的數據，因為 Sahm Rule 需要過去 12 個月的最低點
     combined = pd.DataFrame({
         'cpi_yoy': cpi_df['cpi_yoy'],
+        'core_cpi_yoy': core_cpi_df['core_cpi_yoy'], # 💡 新增
         'unrate': unrate_raw # 💡 併入失業率數據
     }).dropna().tail(12)
 
@@ -216,6 +223,7 @@ def logic_indicators():
         "indicator": "Safety_Monitor",
         "dates": combined.index.strftime('%Y-%m-%d').tolist(),
         "cpi_yoy": combined['cpi_yoy'].tolist(),
+        "core_cpi_yoy": combined['core_cpi_yoy'].tolist(), # 💡 新增輸出
         "unrate": combined['unrate'].tolist() # 💡 輸出失業率供大腦計算 Sahm Rule
     }
 
