@@ -60,19 +60,19 @@ def get_gemini_briefing():
         orders_yoy, yield_spread, cpi, tw_light = "讀取異常", "讀取異常", "讀取異常", "讀取異常"
 
     etf_recommendation = "無（維持現金或觀望）"
-    if etf_data and len(etf_data) > 0:
+    # 判斷大腦是否允許進場或抱緊，且 ETF 有資料時才組裝清單
+    is_action_positive = "回補" in decision.get("action", "") or "抱緊" in decision.get("action", "") or "突擊" in decision.get("action", "")
+    
+    if is_action_positive and etf_data and len(etf_data) > 0:
         etf_lines = []
         for i, etf in enumerate(etf_data, 1): # enumerate(, 1) 讓編號從 1 開始
             code = etf.get('Code', '未知')
             name = etf.get('ETF名稱', '未知')
             score = etf.get('綜合動能分數', 0.0)
-
             # 💡 提取大腦算出的黃金坑標記
             signal = etf.get('訊號標記', '')
             signal_display = f" {signal}" if signal else ""
-
             etf_lines.append(f"  {i}. {code} {name} (動能: {score}){signal_display}")
-        
         # 將陣列組合成換行的字串
         etf_recommendation = "\n" + "\n".join(etf_lines)
 
@@ -89,10 +89,9 @@ def get_gemini_briefing():
     - 美國 CPI: {cpi}%
     - 台灣燈號: {tw_light}
     - 資產配置: {allocation}
-    - 今日強勢嚴選 Top 5: {etf_recommendation}
     """
 
-    # --- 組合寫給 Gemini 的 Prompt ---
+    # --- 步驟 D：組合寫給 Gemini 的 Prompt ---
     prompt = f"""
     你現在是 AccuVest 極簡投資平台的「首席文案轉譯官」。
     你的任務是撰寫今天的晨間推播。
@@ -110,14 +109,12 @@ def get_gemini_briefing():
     結構必須是：
     1. 第一行直接印出核心決策。
     2. 第二段用當前盤面數據簡單解釋這個決策，並列出資產配置。
-    3. 🌟 如果決策是「建議進場」或「強制觀望」，請在最後一段【完整條列出這 5 檔】強勢嚴選標的與分數。
-    4. 🚨 關鍵任務：如果標的後方帶有「🚨 超跌黃金坑」標記，請在文案中用一句話冷靜點出「部分標的出現負乖離，具備潛在右側佈局價值」。
-    5. 語氣要堅定，排版要乾淨俐落，方便在手機上閱讀。
+    3. 語氣要堅定，排版要乾淨俐落，方便在手機上閱讀。
+    注意：你**不需要**在文案中附上 ETF 清單，系統會自動附加在你的文案之後。
     """
     
-
-    # --- 步驟 D：組合寫給 Gemini 的 Prompt ---
-    # (前面組裝 prompt 的程式碼維持不變...)
+    # 進行 API 呼叫與防呆重試
+    ai_response_text = ""
 
     try:
         print("🧠 嘗試使用 gemini-3.5-flash 進行轉譯...")
@@ -154,6 +151,17 @@ def get_gemini_briefing():
             # 如果不是 503 錯誤 (例如 API Key 錯誤)，就直接報錯，不盲目重試
             print("❌ 發生非 503 的嚴重錯誤，請檢查系統。")
             return f"【系統通知】\n決策：{final_action}\n(備註：AI 轉譯發生異常)"
+    
+    # --- 💡 步驟 E：強制將 ETF 清單黏在 AI 文案之後 (Codex 的建議) ---
+    final_text = f"{ai_response_text}\n"
+    
+    if etf_recommendation != "無（維持現金或觀望）":
+        final_text += f"\n🏆【今日強勢嚴選 Top 5】\n{etf_recommendation}\n"
+        # 🚨 關鍵任務：如果有黃金坑標記，用程式補上一句提醒
+        if "🚨 超跌黃金坑" in etf_recommendation:
+             final_text += "\n*(註：部分標的出現負乖離，具備潛在右側佈局價值)*"
+             
+    return final_text
 
 
 def broadcast_to_line(message_text):
